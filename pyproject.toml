@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "resilient-automation-test-stand"
+version = "0.1.0"
+description = "A deterministic FastAPI target for browser automation integration tests"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [
+  { name = "Yehor Maksimov" }
+]
+dependencies = [
+  "fastapi>=0.115,<1.0",
+  "python-multipart>=0.0.20,<1.0",
+  "uvicorn[standard]>=0.34,<1.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.28,<1.0",
+  "pytest>=8.3,<9.0"
+]
+
+[project.scripts]
+automation-test-stand = "app.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+addopts = "-q -p no:cacheprovider"
+testpaths = ["tests"]
+
