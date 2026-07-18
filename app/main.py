@@ -214,7 +214,10 @@ def _catalog_html(config: dict[str, object]) -> str:
 
         try {{
           const response = await fetch(`/api/catalog?${{query}}`);
-          if (!response.ok) throw new Error(`HTTP ${{response.status}}`);
+          if (!response.ok) {{
+            const retryAfter = response.headers.get('Retry-After');
+            throw new Error(`HTTP ${{response.status}}${{retryAfter ? `; retry-after=${{retryAfter}}` : ''}}`);
+          }}
           const data = await response.json();
           const fragment = document.createDocumentFragment();
 
@@ -251,4 +254,3 @@ def _catalog_html(config: dict[str, object]) -> str:
   </body>
 </html>
 """
-
