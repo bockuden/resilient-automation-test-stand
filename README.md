@@ -12,7 +12,8 @@ python -m pip install -e ".[dev]"
 automation-test-stand --port 8080
 ```
 
-The same server can be started with `python -m app --port 8080`.
+The same server can be started with
+`python -m resilient_automation_test_stand --port 8080`.
 
 ## Run with Docker Compose
 
@@ -30,7 +31,10 @@ docker compose up --build demo-site
 - `GET|POST /login` provides a predictable authentication form.
 - `POST /admin/reset` resets scenario counters.
 - `run_id` isolates retry counters between test cases.
-- `scenario` selects success, transient, permanent, slow, DOM-change, or duplicate behavior.
+- `scenario` selects success, transient, permanent, slow, checkpoint-resume,
+  DOM-change, or duplicate behavior.
+- `scenario=resume&fail_page=3` makes earlier pages durable before a terminal
+  failure on the selected page.
 
 ## Future extraction to a separate repository
 
@@ -40,8 +44,6 @@ The `test-stand` directory can be split with Git history, then published as:
 - a versioned OCI image to GHCR or another container registry;
 - a reusable Compose service pinned by image tag.
 
-Before a public `1.0.0`, rename the internal Python import package from the
-generic `app` to `resilient_automation_test_stand`, publish an OpenAPI snapshot,
-add semantic-version compatibility tests, and add a deprecation policy for
-scenario parameters.
-
+The import package is already named `resilient_automation_test_stand`. Before a
+public standalone `1.0.0`, publish an OpenAPI snapshot, add semantic-version
+compatibility tests, and define a deprecation policy for scenario parameters.

@@ -14,7 +14,7 @@ def main() -> None:
     args = parser.parse_args()
 
     uvicorn.run(
-        "app.main:app",
+        "resilient_automation_test_stand.main:app",
         host=args.host,
         port=args.port,
         log_level=args.log_level,
@@ -23,4 +23,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

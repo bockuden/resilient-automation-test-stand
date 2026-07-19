@@ -6,7 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY pyproject.toml ./
-COPY app ./app
+COPY resilient_automation_test_stand ./resilient_automation_test_stand
 RUN pip install --no-cache-dir ".[dev]"
 
 COPY tests ./tests
@@ -14,4 +14,3 @@ COPY tests ./tests
 EXPOSE 8080
 
 CMD ["automation-test-stand", "--host", "0.0.0.0", "--port", "8080"]
-

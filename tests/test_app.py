@@ -1,7 +1,9 @@
+from urllib.parse import parse_qs, urlsplit
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.main import app
+from resilient_automation_test_stand.main import app
 
 
 @pytest.fixture
@@ -49,9 +51,18 @@ async def test_duplicate_scenario_repeats_previous_page_item(client: AsyncClient
 
 @pytest.mark.anyio
 async def test_protected_catalog_requires_login(client: AsyncClient) -> None:
-    response = await client.get("/catalog?protected=true", follow_redirects=False)
+    response = await client.get(
+        "/catalog?scenario=slow&run_id=protected-case&delay_ms=2500&fail_page=4&protected=true",
+        follow_redirects=False,
+    )
     assert response.status_code == 303
     assert response.headers["location"].startswith("/login")
+    next_url = parse_qs(urlsplit(response.headers["location"]).query)["next_url"][0]
+    assert "scenario=slow" in next_url
+    assert "run_id=protected-case" in next_url
+    assert "delay_ms=2500" in next_url
+    assert "fail_page=4" in next_url
+    assert "protected=true" in next_url
 
 
 @pytest.mark.anyio
@@ -63,3 +74,11 @@ async def test_login_sets_session_cookie(client: AsyncClient) -> None:
     )
     assert response.status_code == 303
     assert response.cookies["demo_session"] == "authenticated"
+
+
+@pytest.mark.anyio
+async def test_resume_scenario_fails_only_on_configured_page(client: AsyncClient) -> None:
+    base = "/api/catalog?scenario=resume&run_id=resume-case&fail_page=3"
+    assert (await client.get(f"{base}&page=2")).status_code == 200
+    assert (await client.get(f"{base}&page=3")).status_code == 500
+    assert (await client.get(f"{base}&page=4")).status_code == 200

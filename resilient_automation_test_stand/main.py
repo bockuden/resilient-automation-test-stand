@@ -3,6 +3,7 @@ import json
 from collections import defaultdict
 from html import escape
 from typing import Annotated, Literal
+from urllib.parse import urlencode
 
 from fastapi import Cookie, FastAPI, Form, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -14,6 +15,7 @@ Scenario = Literal[
     "transient",
     "permanent",
     "slow",
+    "resume",
     "dom-change",
     "duplicates",
 ]
@@ -96,18 +98,30 @@ async def catalog(
     run_id: str = "manual",
     fail_for: int = Query(default=2, ge=0, le=10),
     delay_ms: int = Query(default=1500, ge=0, le=30_000),
+    fail_page: int = Query(default=3, ge=1, le=20),
     protected: bool = False,
     demo_session: Annotated[str | None, Cookie()] = None,
 ) -> HTMLResponse:
     if protected and demo_session != "authenticated":
-        query = f"scenario={scenario}&run_id={run_id}&fail_for={fail_for}&delay_ms={delay_ms}&protected=true"
-        return RedirectResponse(f"/login?next_url=/catalog?{query}", status_code=303)
+        target_query = urlencode(
+            {
+                "scenario": scenario,
+                "run_id": run_id,
+                "fail_for": fail_for,
+                "delay_ms": delay_ms,
+                "fail_page": fail_page,
+                "protected": "true",
+            }
+        )
+        login_query = urlencode({"next_url": f"/catalog?{target_query}"})
+        return RedirectResponse(f"/login?{login_query}", status_code=303)
 
     config = {
         "scenario": scenario,
         "runId": run_id,
         "failFor": fail_for,
         "delayMs": delay_ms,
+        "failPage": fail_page,
     }
     return HTMLResponse(_catalog_html(config))
 
@@ -119,6 +133,7 @@ async def catalog_api(
     run_id: str = "manual",
     fail_for: int = Query(default=2, ge=0, le=10),
     delay_ms: int = Query(default=1500, ge=0, le=30_000),
+    fail_page: int = Query(default=3, ge=1, le=20),
 ) -> CatalogPage:
     key = (run_id, scenario, page)
     request_attempts[key] += 1
@@ -135,6 +150,12 @@ async def catalog_api(
         raise HTTPException(
             status_code=500,
             detail={"code": "PERMANENT_CATALOG_FAILURE", "attempt": attempt},
+        )
+
+    if scenario == "resume" and page == fail_page:
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "CHECKPOINT_RESUME_FAILURE", "page": page, "attempt": attempt},
         )
 
     if scenario == "slow":
@@ -210,6 +231,7 @@ def _catalog_html(config: dict[str, object]) -> str:
           run_id: config.runId,
           fail_for: config.failFor,
           delay_ms: config.delayMs,
+          fail_page: config.failPage,
         }});
 
         try {{

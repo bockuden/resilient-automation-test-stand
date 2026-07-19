@@ -25,12 +25,11 @@ dev = [
 ]
 
 [project.scripts]
-automation-test-stand = "app.cli:main"
+automation-test-stand = "resilient_automation_test_stand.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["app*"]
+include = ["resilient_automation_test_stand*"]
 
 [tool.pytest.ini_options]
 addopts = "-q -p no:cacheprovider"
 testpaths = ["tests"]
-
