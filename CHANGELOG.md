@@ -1,6 +1,21 @@
 # Changelog
 
-## 0.2.0 - Unreleased
+## 0.3.0 - Unreleased
+
+### Added
+
+- Validated named scenario presets loaded from TOML configuration.
+- `--preset`, `--list-presets`, and `--print-url` CLI operations.
+- A portable `examples/scenarios.toml` with the documented ten-page and login
+  scenarios.
+
+### Compatibility
+
+Built-in defaults and existing query-based URLs are unchanged. An active
+preset supplies server defaults, while explicitly supplied query parameters
+override only their corresponding fields.
+
+## 0.2.0 - Development milestone
 
 ### Added
 

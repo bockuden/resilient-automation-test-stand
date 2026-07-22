@@ -1,0 +1,15 @@
+[presets.ten-pages]
+scenario = "success"
+total_pages = 10
+
+[presets.login-ten-pages]
+scenario = "success"
+protected = true
+total_pages = 10
+
+[presets.login-delayed-retry]
+scenario = "transient"
+protected = true
+total_pages = 10
+fail_for = 2
+failure_delay_ms = 1500

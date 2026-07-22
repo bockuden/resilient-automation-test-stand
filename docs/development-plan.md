@@ -24,21 +24,20 @@ Acceptance:
 
 ## 0.3.0: named presets and config files
 
-Status: planned.
+Status: implemented in the source tree.
 
-Add optional startup configuration for teams that repeat the same scenario
-sets. Query parameters remain available and override preset defaults.
+Optional startup configuration lets teams name scenario sets they repeat.
+Query parameters remain available and override preset defaults.
 
-Proposed CLI:
+CLI:
 
 ```text
-automation-test-stand --config scenarios.toml
-automation-test-stand --preset login-delayed-retry
-automation-test-stand --list-presets
-automation-test-stand --print-url login-delayed-retry
+automation-test-stand --config scenarios.toml --list-presets
+automation-test-stand --config scenarios.toml --print-url login-delayed-retry
+automation-test-stand --config scenarios.toml --preset login-delayed-retry
 ```
 
-Proposed TOML shape:
+TOML shape:
 
 ```toml
 [presets.login-delayed-retry]

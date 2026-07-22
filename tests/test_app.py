@@ -4,7 +4,8 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 import resilient_automation_test_stand.main as app_module
-from resilient_automation_test_stand.main import app
+from resilient_automation_test_stand.main import app, configure_scenario_defaults
+from resilient_automation_test_stand.presets import ScenarioDefaults
 
 
 @pytest.fixture
@@ -14,10 +15,14 @@ def anyio_backend() -> str:
 
 @pytest.fixture
 async def client() -> AsyncClient:
+    configure_scenario_defaults(ScenarioDefaults())
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as test_client:
         await test_client.post("/admin/reset")
-        yield test_client
+        try:
+            yield test_client
+        finally:
+            configure_scenario_defaults(ScenarioDefaults())
 
 
 @pytest.mark.anyio
@@ -146,3 +151,47 @@ async def test_transient_failure_can_be_delayed(
     assert recovered.status_code == 200
     assert recovered.json()["total_pages"] == 10
     assert delays == [1.25]
+
+
+@pytest.mark.anyio
+async def test_active_preset_supplies_request_defaults(client: AsyncClient) -> None:
+    configure_scenario_defaults(
+        ScenarioDefaults(
+            scenario="transient",
+            protected=True,
+            total_pages=10,
+            fail_for=1,
+            failure_delay_ms=0,
+        )
+    )
+
+    protected = await client.get("/catalog?run_id=preset-login", follow_redirects=False)
+    assert protected.status_code == 303
+    next_url = parse_qs(urlsplit(protected.headers["location"]).query)["next_url"][0]
+    assert "scenario=transient" in next_url
+    assert "total_pages=10" in next_url
+
+    first = await client.get("/api/catalog?run_id=preset-api&page=10")
+    assert first.status_code == 503
+    recovered = await client.get("/api/catalog?run_id=preset-api&page=10")
+    assert recovered.status_code == 200
+    assert recovered.json()["total_pages"] == 10
+
+
+@pytest.mark.anyio
+async def test_query_parameters_override_only_selected_preset_fields(
+    client: AsyncClient,
+) -> None:
+    configure_scenario_defaults(
+        ScenarioDefaults(scenario="transient", total_pages=10, fail_for=3)
+    )
+
+    response = await client.get(
+        "/api/catalog?run_id=preset-override&page=2&scenario=success&total_pages=2"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["scenario"] == "success"
+    assert payload["total_pages"] == 2
+    assert payload["items"][-1]["id"] == "item-010"

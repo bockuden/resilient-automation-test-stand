@@ -149,7 +149,7 @@
   },
   "info": {
     "title": "Resilient Browser Automation Test Stand",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -196,18 +196,24 @@
             "name": "scenario",
             "required": false,
             "schema": {
-              "default": "success",
-              "enum": [
-                "success",
-                "transient",
-                "permanent",
-                "slow",
-                "resume",
-                "dom-change",
-                "duplicates"
+              "anyOf": [
+                {
+                  "enum": [
+                    "success",
+                    "transient",
+                    "permanent",
+                    "slow",
+                    "resume",
+                    "dom-change",
+                    "duplicates"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ],
-              "title": "Scenario",
-              "type": "string"
+              "title": "Scenario"
             }
           },
           {
@@ -225,11 +231,17 @@
             "name": "fail_for",
             "required": false,
             "schema": {
-              "default": 2,
-              "maximum": 10,
-              "minimum": 0,
-              "title": "Fail For",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "maximum": 10,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fail For"
             }
           },
           {
@@ -237,11 +249,17 @@
             "name": "delay_ms",
             "required": false,
             "schema": {
-              "default": 1500,
-              "maximum": 30000,
-              "minimum": 0,
-              "title": "Delay Ms",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "maximum": 30000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Delay Ms"
             }
           },
           {
@@ -249,11 +267,17 @@
             "name": "failure_delay_ms",
             "required": false,
             "schema": {
-              "default": 0,
-              "maximum": 30000,
-              "minimum": 0,
-              "title": "Failure Delay Ms",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "maximum": 30000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Failure Delay Ms"
             }
           },
           {
@@ -261,11 +285,17 @@
             "name": "fail_page",
             "required": false,
             "schema": {
-              "default": 3,
-              "maximum": 20,
-              "minimum": 1,
-              "title": "Fail Page",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "maximum": 20,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fail Page"
             }
           },
           {
@@ -273,11 +303,17 @@
             "name": "total_pages",
             "required": false,
             "schema": {
-              "default": 4,
-              "maximum": 20,
-              "minimum": 1,
-              "title": "Total Pages",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "maximum": 20,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Total Pages"
             }
           }
         ],
@@ -315,18 +351,24 @@
             "name": "scenario",
             "required": false,
             "schema": {
-              "default": "success",
-              "enum": [
-                "success",
-                "transient",
-                "permanent",
-                "slow",
-                "resume",
-                "dom-change",
-                "duplicates"
+              "anyOf": [
+                {
+                  "enum": [
+                    "success",
+                    "transient",
+                    "permanent",
+                    "slow",
+                    "resume",
+                    "dom-change",
+                    "duplicates"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ],
-              "title": "Scenario",
-              "type": "string"
+              "title": "Scenario"
             }
           },
           {
@@ -344,11 +386,17 @@
             "name": "fail_for",
             "required": false,
             "schema": {
-              "default": 2,
-              "maximum": 10,
-              "minimum": 0,
-              "title": "Fail For",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "maximum": 10,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fail For"
             }
           },
           {
@@ -356,11 +404,17 @@
             "name": "delay_ms",
             "required": false,
             "schema": {
-              "default": 1500,
-              "maximum": 30000,
-              "minimum": 0,
-              "title": "Delay Ms",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "maximum": 30000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Delay Ms"
             }
           },
           {
@@ -368,11 +422,17 @@
             "name": "failure_delay_ms",
             "required": false,
             "schema": {
-              "default": 0,
-              "maximum": 30000,
-              "minimum": 0,
-              "title": "Failure Delay Ms",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "maximum": 30000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Failure Delay Ms"
             }
           },
           {
@@ -380,11 +440,17 @@
             "name": "fail_page",
             "required": false,
             "schema": {
-              "default": 3,
-              "maximum": 20,
-              "minimum": 1,
-              "title": "Fail Page",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "maximum": 20,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fail Page"
             }
           },
           {
@@ -392,11 +458,17 @@
             "name": "total_pages",
             "required": false,
             "schema": {
-              "default": 4,
-              "maximum": 20,
-              "minimum": 1,
-              "title": "Total Pages",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "maximum": 20,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Total Pages"
             }
           },
           {
@@ -404,9 +476,15 @@
             "name": "protected",
             "required": false,
             "schema": {
-              "default": false,
-              "title": "Protected",
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Protected"
             }
           },
           {

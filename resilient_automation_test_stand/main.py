@@ -2,31 +2,34 @@ import asyncio
 import json
 from collections import defaultdict
 from html import escape
-from typing import Annotated, Literal
+from typing import Annotated
 from urllib.parse import urlencode
 
 from fastapi import Cookie, FastAPI, Form, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 
-
-Scenario = Literal[
-    "success",
-    "transient",
-    "permanent",
-    "slow",
-    "resume",
-    "dom-change",
-    "duplicates",
-]
+from resilient_automation_test_stand.presets import Scenario, ScenarioDefaults
 
 app = FastAPI(
     title="Resilient Browser Automation Test Stand",
-    version="0.2.0",
+    version="0.3.0",
     docs_url="/api-docs",
 )
+app.state.scenario_defaults = ScenarioDefaults()
 
 request_attempts: dict[tuple[str, str, int], int] = defaultdict(int)
+
+
+def configure_scenario_defaults(defaults: ScenarioDefaults) -> None:
+    app.state.scenario_defaults = defaults
+
+
+def _resolved_defaults(**overrides: object | None) -> ScenarioDefaults:
+    current: ScenarioDefaults = app.state.scenario_defaults
+    values = current.model_dump()
+    values.update({name: value for name, value in overrides.items() if value is not None})
+    return ScenarioDefaults.model_validate(values)
 
 
 class CatalogItem(BaseModel):
@@ -94,26 +97,36 @@ async def login(
 
 @app.get("/catalog", response_class=HTMLResponse)
 async def catalog(
-    scenario: Scenario = "success",
+    scenario: Scenario | None = None,
     run_id: str = "manual",
-    fail_for: int = Query(default=2, ge=0, le=10),
-    delay_ms: int = Query(default=1500, ge=0, le=30_000),
-    failure_delay_ms: int = Query(default=0, ge=0, le=30_000),
-    fail_page: int = Query(default=3, ge=1, le=20),
-    total_pages: int = Query(default=4, ge=1, le=20),
-    protected: bool = False,
+    fail_for: int | None = Query(default=None, ge=0, le=10),
+    delay_ms: int | None = Query(default=None, ge=0, le=30_000),
+    failure_delay_ms: int | None = Query(default=None, ge=0, le=30_000),
+    fail_page: int | None = Query(default=None, ge=1, le=20),
+    total_pages: int | None = Query(default=None, ge=1, le=20),
+    protected: bool | None = None,
     demo_session: Annotated[str | None, Cookie()] = None,
 ) -> HTMLResponse:
-    if protected and demo_session != "authenticated":
+    defaults = _resolved_defaults(
+        scenario=scenario,
+        protected=protected,
+        total_pages=total_pages,
+        fail_for=fail_for,
+        failure_delay_ms=failure_delay_ms,
+        delay_ms=delay_ms,
+        fail_page=fail_page,
+    )
+
+    if defaults.protected and demo_session != "authenticated":
         target_query = urlencode(
             {
-                "scenario": scenario,
+                "scenario": defaults.scenario,
                 "run_id": run_id,
-                "fail_for": fail_for,
-                "delay_ms": delay_ms,
-                "failure_delay_ms": failure_delay_ms,
-                "fail_page": fail_page,
-                "total_pages": total_pages,
+                "fail_for": defaults.fail_for,
+                "delay_ms": defaults.delay_ms,
+                "failure_delay_ms": defaults.failure_delay_ms,
+                "fail_page": defaults.fail_page,
+                "total_pages": defaults.total_pages,
                 "protected": "true",
             }
         )
@@ -121,13 +134,13 @@ async def catalog(
         return RedirectResponse(f"/login?{login_query}", status_code=303)
 
     config = {
-        "scenario": scenario,
+        "scenario": defaults.scenario,
         "runId": run_id,
-        "failFor": fail_for,
-        "delayMs": delay_ms,
-        "failureDelayMs": failure_delay_ms,
-        "failPage": fail_page,
-        "totalPages": total_pages,
+        "failFor": defaults.fail_for,
+        "delayMs": defaults.delay_ms,
+        "failureDelayMs": defaults.failure_delay_ms,
+        "failPage": defaults.fail_page,
+        "totalPages": defaults.total_pages,
     }
     return HTMLResponse(_catalog_html(config))
 
@@ -135,47 +148,55 @@ async def catalog(
 @app.get("/api/catalog", response_model=CatalogPage)
 async def catalog_api(
     page: int = Query(default=1, ge=1, le=20),
-    scenario: Scenario = "success",
+    scenario: Scenario | None = None,
     run_id: str = "manual",
-    fail_for: int = Query(default=2, ge=0, le=10),
-    delay_ms: int = Query(default=1500, ge=0, le=30_000),
-    failure_delay_ms: int = Query(default=0, ge=0, le=30_000),
-    fail_page: int = Query(default=3, ge=1, le=20),
-    total_pages: int = Query(default=4, ge=1, le=20),
+    fail_for: int | None = Query(default=None, ge=0, le=10),
+    delay_ms: int | None = Query(default=None, ge=0, le=30_000),
+    failure_delay_ms: int | None = Query(default=None, ge=0, le=30_000),
+    fail_page: int | None = Query(default=None, ge=1, le=20),
+    total_pages: int | None = Query(default=None, ge=1, le=20),
 ) -> CatalogPage:
-    key = (run_id, scenario, page)
+    defaults = _resolved_defaults(
+        scenario=scenario,
+        total_pages=total_pages,
+        fail_for=fail_for,
+        failure_delay_ms=failure_delay_ms,
+        delay_ms=delay_ms,
+        fail_page=fail_page,
+    )
+    key = (run_id, defaults.scenario, page)
     request_attempts[key] += 1
     attempt = request_attempts[key]
 
-    if scenario == "transient" and attempt <= fail_for:
-        if failure_delay_ms:
-            await asyncio.sleep(failure_delay_ms / 1000)
+    if defaults.scenario == "transient" and attempt <= defaults.fail_for:
+        if defaults.failure_delay_ms:
+            await asyncio.sleep(defaults.failure_delay_ms / 1000)
         raise HTTPException(
             status_code=503,
             detail={"code": "TRANSIENT_CATALOG_FAILURE", "attempt": attempt},
             headers={"Retry-After": "1"},
         )
 
-    if scenario == "permanent":
+    if defaults.scenario == "permanent":
         raise HTTPException(
             status_code=500,
             detail={"code": "PERMANENT_CATALOG_FAILURE", "attempt": attempt},
         )
 
-    if scenario == "resume" and page == fail_page:
+    if defaults.scenario == "resume" and page == defaults.fail_page:
         raise HTTPException(
             status_code=500,
             detail={"code": "CHECKPOINT_RESUME_FAILURE", "page": page, "attempt": attempt},
         )
 
-    if scenario == "slow":
-        await asyncio.sleep(delay_ms / 1000)
+    if defaults.scenario == "slow":
+        await asyncio.sleep(defaults.delay_ms / 1000)
 
     return CatalogPage(
         page=page,
-        total_pages=total_pages,
-        items=_items_for_page(page, scenario, total_pages),
-        scenario=scenario,
+        total_pages=defaults.total_pages,
+        items=_items_for_page(page, defaults.scenario, defaults.total_pages),
+        scenario=defaults.scenario,
         attempt=attempt,
     )
 

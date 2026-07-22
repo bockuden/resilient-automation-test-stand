@@ -107,6 +107,41 @@ The delayed transient example waits 1.5 seconds before each of the first two
 reloaded; an automation worker can exercise its retry policy and recover on the
 third attempt.
 
+## Named scenario presets
+
+For repeated scenarios, the same values can be stored in a TOML file instead
+of copied into every startup command. The repository includes
+[`examples/scenarios.toml`](examples/scenarios.toml) with the three cookbook
+scenarios above.
+
+These CLI commands are identical in PowerShell, Linux, and macOS shells:
+
+```bash
+automation-test-stand --config examples/scenarios.toml --list-presets
+automation-test-stand --config examples/scenarios.toml --print-url login-delayed-retry
+automation-test-stand --config examples/scenarios.toml --preset login-delayed-retry --port 8080
+```
+
+`--print-url` emits a self-contained URL that no longer depends on the config
+file. `--preset` starts the server with that preset as its defaults. An explicit
+query parameter overrides only the matching preset field, so the following URL
+uses the preset's ten pages but disables its transient failures:
+
+```text
+http://localhost:8080/catalog?scenario=success&run_id=override-example
+```
+
+Preset files use this shape; omitted fields inherit the built-in defaults:
+
+```toml
+[presets.login-delayed-retry]
+protected = true
+scenario = "transient"
+total_pages = 10
+fail_for = 2
+failure_delay_ms = 1500
+```
+
 To fetch all ten pages directly from the API, use either loop below.
 
 Windows PowerShell:
@@ -145,7 +180,7 @@ done
 Both `/catalog` and `/api/catalog` accept the parameters below. `/api/catalog`
 also accepts `page` from 1 through 20.
 
-| Parameter | Default | Meaning |
+| Parameter | Built-in default | Meaning |
 | --- | --- | --- |
 | `scenario` | `success` | Selects the deterministic behavior described below |
 | `run_id` | `manual` | Isolates request-attempt counters between test cases |
@@ -190,9 +225,8 @@ python scripts/export_openapi.py
 ```
 
 Contract changes require an updated snapshot, [release notes](CHANGELOG.md), a
-package version change, and a backward-compatibility review. Planned named
-presets and config support are described in
-[the development plan](docs/development-plan.md).
+package version change, and a backward-compatibility review. The release
+roadmap is tracked in [the development plan](docs/development-plan.md).
 
 ## License
 
