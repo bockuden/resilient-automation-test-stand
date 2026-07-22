@@ -11,13 +11,13 @@ infrastructure and is not intended to serve production traffic.
 
 Requirements: Python 3.11 or newer.
 
+Only virtual-environment creation and activation differ by platform.
+
 Windows PowerShell:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -e '.[dev]'
-automation-test-stand --port 8080
 ```
 
 Linux and macOS:
@@ -25,6 +25,12 @@ Linux and macOS:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
+```
+
+After activation, installation and startup are identical in PowerShell, Linux,
+and macOS shells:
+
+```bash
 python -m pip install -e '.[dev]'
 automation-test-stand --port 8080
 ```
@@ -62,10 +68,41 @@ The development image is named `resilient-automation-test-stand:dev`.
 Released images are published as
 `ghcr.io/bockuden/resilient-automation-test-stand:<version>`.
 
+## Demo authentication
+
+Add `protected=true` to a `/catalog` URL, or select a preset with
+`protected = true`, to redirect the browser to the login form. The credentials
+are fixed test-stand values:
+
+| Value | Input |
+| --- | --- |
+| Username | `demo` |
+| Password | `automation` |
+
+They are intentionally not configured in `scenarios.toml`. That file selects
+whether login is required; a user enters the values above in the form, while an
+automation script fills `input[name="username"]` and
+`input[name="password"]`, then submits the form.
+
+The equivalent form request is:
+
+```http
+POST /login
+Content-Type: application/x-www-form-urlencoded
+
+username=demo&password=automation&next_url=/catalog?protected=true
+```
+
+Successful login sets the `demo_session=authenticated` cookie and redirects
+back to `next_url`. A script that posts the form directly must preserve this
+cookie for the following `/catalog` request. Authentication protects the
+browser catalog route; `/api/catalog` remains directly accessible for API-only
+tests.
+
 ## Scenario cookbook
 
 Start the server first, then use one of the commands below. Protected scenarios
-redirect to the login form; use username `demo` and password `automation`.
+redirect to the demo login form described above.
 
 ### Windows PowerShell
 
