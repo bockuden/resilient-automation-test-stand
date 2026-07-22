@@ -1,0 +1,74 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install package and build tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]' build
+
+      - name: Run tests
+        run: python -m pytest
+
+      - name: Verify OpenAPI snapshot
+        run: python scripts/export_openapi.py --check
+
+      - name: Build wheel and source distribution
+        run: python -m build
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build runtime image
+        run: docker build --tag resilient-automation-test-stand:ci .
+
+      - name: Start runtime image
+        run: docker run --detach --name automation-test-stand-ci --publish 8080:8080 resilient-automation-test-stand:ci
+
+      - name: Wait for health and verify endpoints
+        shell: bash
+        run: |
+          for attempt in {1..30}; do
+            if curl --fail --silent http://localhost:8080/health >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              docker logs automation-test-stand-ci
+              exit 1
+            fi
+            sleep 1
+          done
+          curl --fail --silent http://localhost:8080/catalog >/dev/null
+          docker exec automation-test-stand-ci python -c "import importlib.util, pathlib; assert importlib.util.find_spec('pytest') is None; assert not pathlib.Path('/app/tests').exists()"
+
+      - name: Stop runtime image
+        if: always()
+        run: docker rm --force automation-test-stand-ci

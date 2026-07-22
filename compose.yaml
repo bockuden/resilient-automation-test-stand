@@ -1,0 +1,23 @@
+services:
+  automation-test-stand:
+    build:
+      context: .
+    image: resilient-automation-test-stand:dev
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >
+          import urllib.request;
+          urllib.request.urlopen(
+            'http://localhost:8080/health',
+            timeout=2
+          )
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    init: true

@@ -5,11 +5,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 COPY resilient_automation_test_stand ./resilient_automation_test_stand
-RUN pip install --no-cache-dir ".[dev]"
-
-COPY tests ./tests
+RUN pip install --no-cache-dir .
 
 EXPOSE 8080
 

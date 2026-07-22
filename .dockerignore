@@ -1,0 +1,10 @@
+.git/
+.github/
+.venv/
+.venv-wheel-test/
+.tmp/
+.pytest_cache/
+__pycache__/
+dist/
+build/
+*.egg-info/

@@ -1,0 +1,11 @@
+.venv/
+.venv-wheel-test/
+.tmp/
+dist/
+build/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.coverage
+htmlcov/
