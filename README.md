@@ -7,9 +7,11 @@ The stand is deliberately stateful within one process: retry counters are
 isolated by `run_id` and can be reset between test cases. It is test
 infrastructure and is not intended to serve production traffic.
 
-## Run with Python
+## Quick start with Python
 
-PowerShell:
+Requirements: Python 3.11 or newer.
+
+Windows PowerShell:
 
 ```powershell
 python -m venv .venv
@@ -18,23 +20,113 @@ python -m pip install -e '.[dev]'
 automation-test-stand --port 8080
 ```
 
-The module entry point is equivalent:
+Linux and macOS:
 
-```powershell
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+automation-test-stand --port 8080
+```
+
+The module entry point is equivalent on every platform:
+
+```bash
 python -m resilient_automation_test_stand --port 8080
 ```
 
-## Run with Docker Compose
+## Quick start with Docker Compose
 
-```powershell
+These commands are the same in PowerShell, Linux shells, and macOS Terminal:
+
+```bash
 docker compose up --build --detach --wait
-Invoke-RestMethod http://localhost:8080/health
 docker compose down
 ```
 
-The development Compose image is named
-`resilient-automation-test-stand:dev`. Released images are published as
+Check readiness while the service is running.
+
+Windows PowerShell:
+
+```powershell
+Invoke-RestMethod http://localhost:8080/health
+```
+
+Linux and macOS:
+
+```bash
+curl --fail http://localhost:8080/health
+```
+
+The development image is named `resilient-automation-test-stand:dev`.
+Released images are published as
 `ghcr.io/bockuden/resilient-automation-test-stand:<version>`.
+
+## Scenario cookbook
+
+Start the server first, then use one of the commands below. Protected scenarios
+redirect to the login form; use username `demo` and password `automation`.
+
+### Windows PowerShell
+
+```powershell
+$catalog = 'http://localhost:8080/catalog'
+
+# Ten successful catalog pages.
+Start-Process "$catalog?scenario=success&run_id=ten-pages&total_pages=10"
+
+# Login, then ten successful catalog pages.
+Start-Process "$catalog?protected=true&scenario=success&run_id=login-ten-pages&total_pages=10"
+
+# Login, then two delayed 503 responses per page before recovery.
+Start-Process "$catalog?protected=true&scenario=transient&run_id=login-delayed-503&total_pages=10&fail_for=2&failure_delay_ms=1500"
+```
+
+### Linux
+
+```bash
+catalog='http://localhost:8080/catalog'
+
+xdg-open "${catalog}?scenario=success&run_id=ten-pages&total_pages=10"
+xdg-open "${catalog}?protected=true&scenario=success&run_id=login-ten-pages&total_pages=10"
+xdg-open "${catalog}?protected=true&scenario=transient&run_id=login-delayed-503&total_pages=10&fail_for=2&failure_delay_ms=1500"
+```
+
+### macOS
+
+```bash
+catalog='http://localhost:8080/catalog'
+
+open "${catalog}?scenario=success&run_id=ten-pages&total_pages=10"
+open "${catalog}?protected=true&scenario=success&run_id=login-ten-pages&total_pages=10"
+open "${catalog}?protected=true&scenario=transient&run_id=login-delayed-503&total_pages=10&fail_for=2&failure_delay_ms=1500"
+```
+
+The delayed transient example waits 1.5 seconds before each of the first two
+`503` responses on every page. A manual browser displays the error and can be
+reloaded; an automation worker can exercise its retry policy and recover on the
+third attempt.
+
+To fetch all ten pages directly from the API, use either loop below.
+
+Windows PowerShell:
+
+```powershell
+1..10 | ForEach-Object {
+    Invoke-RestMethod "http://localhost:8080/api/catalog?scenario=success&run_id=api-ten-pages&page=$_&total_pages=10"
+}
+```
+
+Linux and macOS:
+
+```bash
+page=1
+while [ "$page" -le 10 ]; do
+  curl --fail "http://localhost:8080/api/catalog?scenario=success&run_id=api-ten-pages&page=${page}&total_pages=10"
+  printf '\n'
+  page=$((page + 1))
+done
+```
 
 ## Endpoints
 
@@ -48,9 +140,6 @@ The development Compose image is named
 | `POST` | `/admin/reset` | Clear all in-memory attempt counters |
 | `GET` | `/api-docs` | Interactive OpenAPI documentation |
 
-Use username `demo` and password `automation` for protected catalog pages.
-Add `protected=true` to `/catalog` to require authentication.
-
 ## Scenario parameters
 
 Both `/catalog` and `/api/catalog` accept the parameters below. `/api/catalog`
@@ -60,15 +149,18 @@ also accepts `page` from 1 through 20.
 | --- | --- | --- |
 | `scenario` | `success` | Selects the deterministic behavior described below |
 | `run_id` | `manual` | Isolates request-attempt counters between test cases |
-| `fail_for` | `2` | Number of initial failures per page in `transient` (0–10) |
-| `delay_ms` | `1500` | Delay per API request in `slow` (0–30000 ms) |
-| `fail_page` | `3` | Permanently failing page in `resume` (1–20) |
+| `total_pages` | `4` | Number of catalog pages to expose (1-20) |
+| `fail_for` | `2` | Initial `503` responses per page in `transient` (0-10) |
+| `failure_delay_ms` | `0` | Delay before each transient `503` response (0-30000 ms) |
+| `delay_ms` | `1500` | Delay per API request in `slow` (0-30000 ms) |
+| `fail_page` | `3` | Permanently failing page in `resume` (1-20) |
+| `protected` | `false` | Require the demo login before serving `/catalog` |
 
 ## Scenarios
 
 | Scenario | Behavior |
 | --- | --- |
-| `success` | Returns four pages of five unique items each |
+| `success` | Returns `total_pages` pages of five unique items each |
 | `transient` | Returns `503` with `Retry-After: 1` for the first `fail_for` attempts of each page, then recovers |
 | `permanent` | Always returns `500` from the catalog API |
 | `slow` | Delays every catalog API response by `delay_ms`, enabling timeout and cancellation tests |
@@ -81,7 +173,9 @@ The same `run_id`, scenario, and page share an attempt counter. Call
 
 ## Development and contract checks
 
-```powershell
+After activating the virtual environment:
+
+```bash
 python -m pip install -e '.[dev]' build
 python -m pytest
 python scripts/export_openapi.py --check
@@ -91,12 +185,14 @@ python -m build
 The committed contract is [docs/api/openapi.json](docs/api/openapi.json). If an
 endpoint or model changes, regenerate it with:
 
-```powershell
+```bash
 python scripts/export_openapi.py
 ```
 
-Contract changes also require release notes, a package version change, and a
-backward-compatibility review.
+Contract changes require an updated snapshot, [release notes](CHANGELOG.md), a
+package version change, and a backward-compatibility review. Planned named
+presets and config support are described in
+[the development plan](docs/development-plan.md).
 
 ## License
 

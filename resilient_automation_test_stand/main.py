@@ -22,7 +22,7 @@ Scenario = Literal[
 
 app = FastAPI(
     title="Resilient Browser Automation Test Stand",
-    version="0.1.0",
+    version="0.2.0",
     docs_url="/api-docs",
 )
 
@@ -98,7 +98,9 @@ async def catalog(
     run_id: str = "manual",
     fail_for: int = Query(default=2, ge=0, le=10),
     delay_ms: int = Query(default=1500, ge=0, le=30_000),
+    failure_delay_ms: int = Query(default=0, ge=0, le=30_000),
     fail_page: int = Query(default=3, ge=1, le=20),
+    total_pages: int = Query(default=4, ge=1, le=20),
     protected: bool = False,
     demo_session: Annotated[str | None, Cookie()] = None,
 ) -> HTMLResponse:
@@ -109,7 +111,9 @@ async def catalog(
                 "run_id": run_id,
                 "fail_for": fail_for,
                 "delay_ms": delay_ms,
+                "failure_delay_ms": failure_delay_ms,
                 "fail_page": fail_page,
+                "total_pages": total_pages,
                 "protected": "true",
             }
         )
@@ -121,7 +125,9 @@ async def catalog(
         "runId": run_id,
         "failFor": fail_for,
         "delayMs": delay_ms,
+        "failureDelayMs": failure_delay_ms,
         "failPage": fail_page,
+        "totalPages": total_pages,
     }
     return HTMLResponse(_catalog_html(config))
 
@@ -133,13 +139,17 @@ async def catalog_api(
     run_id: str = "manual",
     fail_for: int = Query(default=2, ge=0, le=10),
     delay_ms: int = Query(default=1500, ge=0, le=30_000),
+    failure_delay_ms: int = Query(default=0, ge=0, le=30_000),
     fail_page: int = Query(default=3, ge=1, le=20),
+    total_pages: int = Query(default=4, ge=1, le=20),
 ) -> CatalogPage:
     key = (run_id, scenario, page)
     request_attempts[key] += 1
     attempt = request_attempts[key]
 
     if scenario == "transient" and attempt <= fail_for:
+        if failure_delay_ms:
+            await asyncio.sleep(failure_delay_ms / 1000)
         raise HTTPException(
             status_code=503,
             detail={"code": "TRANSIENT_CATALOG_FAILURE", "attempt": attempt},
@@ -161,7 +171,6 @@ async def catalog_api(
     if scenario == "slow":
         await asyncio.sleep(delay_ms / 1000)
 
-    total_pages = 4
     return CatalogPage(
         page=page,
         total_pages=total_pages,
@@ -231,7 +240,9 @@ def _catalog_html(config: dict[str, object]) -> str:
           run_id: config.runId,
           fail_for: config.failFor,
           delay_ms: config.delayMs,
+          failure_delay_ms: config.failureDelayMs,
           fail_page: config.failPage,
+          total_pages: config.totalPages,
         }});
 
         try {{
