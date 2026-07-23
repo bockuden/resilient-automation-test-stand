@@ -1,3 +1,3 @@
 include CHANGELOG.md
-recursive-include docs *.json *.md
+recursive-include docs *.gif *.json *.md
 recursive-include examples *.toml

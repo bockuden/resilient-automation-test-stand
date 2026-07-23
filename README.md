@@ -1,11 +1,65 @@
 # Resilient Automation Test Stand
 
-A deterministic FastAPI target for browser automation, retry, pagination,
-authentication, DOM changes, cancellation, and recovery scenarios.
+[![Build and test](https://github.com/bockuden/resilient-automation-test-stand/actions/workflows/tests.yml/badge.svg)](https://github.com/bockuden/resilient-automation-test-stand/actions/workflows/tests.yml)
+[![Python 3.11–3.13](https://img.shields.io/badge/python-3.11%E2%80%933.13-blue)](pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+Test whether browser automation recovers from real, repeatable failures—not
+just happy-path responses. This FastAPI stand supplies deterministic retries,
+pagination, login, DOM changes, duplicates, cancellation, and resume cases for
+Playwright, Selenium, and any HTTP-aware worker.
 
 The stand is deliberately stateful within one process: retry counters are
 isolated by `run_id` and can be reset between test cases. It is test
 infrastructure and is not intended to serve production traffic.
+
+## Run a failure-and-recovery scenario in three commands
+
+```bash
+docker compose up --build --detach --wait
+```
+
+Open the following URL in a browser or let an automation worker navigate to it:
+
+```text
+http://localhost:8080/catalog?scenario=transient&run_id=readme-demo&fail_for=2
+```
+
+Then stop the stand:
+
+```bash
+docker compose down
+```
+
+The first two catalog API requests return `503` and `Retry-After: 1`; later
+requests for the same `run_id` succeed. Use a new `run_id` for an independent
+test run.
+
+![A real transient scenario: two 503 responses with Retry-After, then a successful catalog load](docs/assets/transient-retry.gif)
+
+## Who this is for
+
+- QA and SDET engineers validating retry, timeout, checkpoint, and evidence
+  handling in browser workers.
+- Scraping and data engineers who need a deterministic target for pagination,
+  duplicates, DOM changes, and resumable collection.
+- Library authors who want contract fixtures before integrating with a variable
+  third-party website.
+- Educators teaching resilient automation without depending on a live site.
+
+## Why not use an ordinary mock server?
+
+An ordinary mock often returns one static response. This stand keeps a small,
+isolated state machine per `run_id`, so a consumer has to prove its behavior
+across an ordered sequence of requests.
+
+| Failure mode | What a consumer can prove |
+| --- | --- |
+| `transient` | It honors `Retry-After`, limits retries, and eventually succeeds. |
+| `resume` | It saves progress and resumes after a permanent page failure. |
+| `dom-change` | It relies on stable `data-testid` locators rather than CSS shape. |
+| `duplicates` | It deduplicates items across pagination boundaries. |
+| `protected` | It preserves the demo login session and return URL. |
 
 ## Quick start with Python
 
@@ -41,7 +95,7 @@ The module entry point is equivalent on every platform:
 python -m resilient_automation_test_stand --port 8080
 ```
 
-## Quick start with Docker Compose
+## Docker Compose details
 
 These commands are the same in PowerShell, Linux shells, and macOS Terminal:
 
@@ -67,6 +121,15 @@ curl --fail http://localhost:8080/health
 The development image is named `resilient-automation-test-stand:dev`.
 Released images are published as
 `ghcr.io/bockuden/resilient-automation-test-stand:<version>`.
+
+## Troubleshooting
+
+| Symptom | Resolution |
+| --- | --- |
+| Port `8080` is already in use | Change the Compose port mapping or stop the process that owns the port, then run `docker compose up --build --detach --wait` again. |
+| A transient scenario succeeds or fails at an unexpected attempt | Use a new `run_id`, or call `POST /admin/reset` before the test. Counters are intentionally shared only within one `run_id`. |
+| A protected catalog returns the login form again | Preserve the `demo_session` cookie after submitting the login form; direct API requests to `/api/catalog` do not require it. |
+| Docker cannot run the image on the current machine | Use a Docker engine that can run the image platform, or run the Python quick start locally instead. |
 
 ## Demo authentication
 
@@ -143,6 +206,61 @@ The delayed transient example waits 1.5 seconds before each of the first two
 `503` responses on every page. A manual browser displays the error and can be
 reloaded; an automation worker can exercise its retry policy and recover on the
 third attempt.
+
+## Python Playwright: retry a transient browser scenario
+
+Install the Python Playwright package and browser once, then run this while the
+Compose service above is running:
+
+```bash
+python -m pip install playwright
+playwright install chromium
+```
+
+```python
+import time
+
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import expect, sync_playwright
+
+url = (
+    "http://localhost:8080/catalog?scenario=transient"
+    "&protected=true&run_id=playwright-readme&fail_for=2"
+)
+
+with sync_playwright() as playwright:
+    browser = playwright.chromium.launch()
+    page = browser.new_page()
+    page.goto(url)
+    page.get_by_label("Username").fill("demo")
+    page.get_by_label("Password").fill("automation")
+    with page.expect_navigation():
+        page.get_by_role("button", name="Sign in").click()
+
+    for attempt in range(1, 4):
+        try:
+            expect(page.get_by_test_id("catalog-item").first).to_be_visible(timeout=2_000)
+            break
+        except PlaywrightTimeoutError:
+            expect(page.get_by_test_id("catalog-error")).to_contain_text(
+                "HTTP 503; retry-after=1"
+            )
+            time.sleep(1)
+            page.reload()
+    else:
+        raise RuntimeError("The transient scenario did not recover within its retry budget")
+
+    expect(page.get_by_test_id("catalog-item")).to_have_count(5)
+    browser.close()
+```
+
+The stand does not retry for the consumer: the example makes the retry budget
+and `Retry-After` wait explicit, then proves that the third browser load
+recovers.
+
+For a production-style .NET consumer with retries, checkpoints, cancellation,
+and browser evidence, see
+[resilient-browser-automation](https://github.com/bockuden/resilient-browser-automation).
 
 ## Named scenario presets
 

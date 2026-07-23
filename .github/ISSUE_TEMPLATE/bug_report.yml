@@ -1,0 +1,21 @@
+name: Bug report
+description: Report a reproducible problem with the stand or its contract.
+title: "bug: "
+body:
+  - type: textarea
+    attributes:
+      label: Reproduction
+      description: Include the command or URL, scenario, run_id, and observed result.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Version or commit
+      placeholder: "0.3.0 or commit SHA"
+    validations:
+      required: true
