@@ -9,7 +9,7 @@ Before the first PyPI publication, configure a PyPI Trusted Publisher for:
 
 - owner: `bockuden`;
 - repository: `resilient-automation-test-stand`;
-- workflow: `.github/workflows/release.yml`;
+- workflow filename: `release.yml` (the file is located at `.github/workflows/release.yml`);
 - GitHub environment: `pypi`.
 
 Create the GitHub `pypi` environment and, where practical, protect it with a
