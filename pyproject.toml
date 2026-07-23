@@ -9,6 +9,28 @@ description = "A deterministic FastAPI target for browser automation integration
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
+keywords = [
+  "browser-automation",
+  "chaos-testing",
+  "fastapi",
+  "integration-testing",
+  "playwright",
+  "resilience",
+  "selenium",
+  "testing",
+  "web-scraping",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Testing",
+]
 authors = [
   { name = "Yehor Maksimov" }
 ]
@@ -26,6 +48,13 @@ dev = [
 
 [project.scripts]
 automation-test-stand = "resilient_automation_test_stand.cli:main"
+
+[project.urls]
+Source = "https://github.com/bockuden/resilient-automation-test-stand"
+Issues = "https://github.com/bockuden/resilient-automation-test-stand/issues"
+Documentation = "https://github.com/bockuden/resilient-automation-test-stand#readme"
+Changelog = "https://github.com/bockuden/resilient-automation-test-stand/blob/main/CHANGELOG.md"
+"API contract" = "https://github.com/bockuden/resilient-automation-test-stand/blob/main/docs/compatibility.md"
 
 [tool.setuptools.packages.find]
 include = ["resilient_automation_test_stand*"]

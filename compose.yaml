@@ -3,6 +3,7 @@ services:
     build:
       context: .
     image: resilient-automation-test-stand:dev
+    read_only: true
     ports:
       - "8080:8080"
     healthcheck:
