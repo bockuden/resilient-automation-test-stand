@@ -322,20 +322,43 @@ def _catalog_html(config: dict[str, object]) -> str:
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Deterministic demo catalog</title>
     <style>
-      body {{ font-family: system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }}
-      #catalog {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }}
-      [data-testid="catalog-item"] {{ border: 1px solid #bbb; border-radius: .5rem; padding: 1rem; }}
-      #status {{ min-height: 1.5rem; }}
-      nav {{ display: flex; gap: .5rem; margin-top: 1rem; }}
+      :root {{ color: #e6edf7; background: #0b1220; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }}
+      * {{ box-sizing: border-box; }}
+      body {{ margin: 0; min-width: 320px; background: radial-gradient(circle at 15% -10%, #203f6d 0, transparent 35%), #0b1220; }}
+      main {{ width: min(100% - 2rem, 1100px); margin: 0 auto; padding: 3.5rem 0 4rem; }}
+      .hero {{ display: grid; gap: .9rem; max-width: 720px; }}
+      .eyebrow {{ width: fit-content; padding: .35rem .65rem; border: 1px solid #4279bc; border-radius: 999px; color: #a8cdfd; font-size: .75rem; font-weight: 750; letter-spacing: .08em; }}
+      h1 {{ margin: 0; color: #fff; font-size: clamp(2.35rem, 7vw, 4.5rem); line-height: .98; letter-spacing: -.055em; }}
+      .lede {{ max-width: 620px; margin: 0; color: #b9c8dc; font-size: 1.1rem; line-height: 1.6; }}
+      .scenario-pill {{ width: fit-content; margin: .4rem 0 1.8rem; padding: .6rem .8rem; border: 1px solid #334d70; border-radius: .6rem; background: #121e30; color: #a9b9d0; }}
+      .scenario-pill strong {{ color: #7dd3fc; }}
+      .workspace {{ padding: 1.2rem; border: 1px solid #263c5a; border-radius: 1.25rem; background: rgba(16, 28, 46, .9); box-shadow: 0 24px 70px rgba(0, 0, 0, .28); }}
+      #status {{ min-height: 3.5rem; margin: 0 0 1.2rem; padding: .9rem 1rem; border: 1px solid #355374; border-radius: .8rem; background: #102038; color: #d9e9fb; font-weight: 650; }}
+      #status[data-state="error"] {{ border-color: #a85454; background: #351b27; color: #ffd5d5; }}
+      #status[data-state="success"] {{ border-color: #237a69; background: #10342f; color: #c5f5e8; }}
+      #catalog {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 1rem; }}
+      [data-testid="catalog-item"] {{ min-height: 152px; padding: 1.1rem; border: 1px solid #315072; border-radius: .95rem; background: linear-gradient(145deg, #172a45, #102039); box-shadow: inset 0 1px rgba(255, 255, 255, .04); }}
+      [data-testid="catalog-item"] h2, [data-testid="item-name"] {{ display: block; margin: 0 0 2.1rem; color: #f3f8ff; font-size: 1rem; line-height: 1.35; }}
+      [data-testid="item-price"] {{ color: #7dd3fc; font-size: 1.55rem; font-weight: 780; }}
+      nav {{ display: flex; justify-content: flex-end; margin-top: 1.25rem; }}
+      button {{ padding: .75rem 1rem; border: 0; border-radius: .65rem; background: #38bdf8; color: #082033; font: inherit; font-weight: 800; cursor: pointer; }}
+      button:hover {{ background: #7dd3fc; }}
+      @media (max-width: 600px) {{ main {{ width: min(100% - 1.25rem, 1100px); padding-top: 2rem; }} .workspace {{ padding: .8rem; }} }}
     </style>
   </head>
   <body>
     <main>
-      <h1>Deterministic demo catalog</h1>
-      <p id="scenario">Scenario: <strong>{escape(str(config["scenario"]))}</strong></p>
-      <p id="status" role="status">Loading page 1...</p>
-      <section id="catalog" data-testid="catalog"></section>
-      <nav aria-label="Catalog pagination"></nav>
+      <header class="hero">
+        <span class="eyebrow">RESILIENCE TEST TARGET</span>
+        <h1>Deterministic demo catalog</h1>
+        <p class="lede">A predictable browser surface for proving recovery, pagination, and durable automation behavior.</p>
+      </header>
+      <p id="scenario" class="scenario-pill">Scenario: <strong>{escape(str(config["scenario"]))}</strong></p>
+      <section class="workspace" aria-label="Catalog result">
+        <p id="status" role="status" data-state="loading">Loading page 1...</p>
+        <section id="catalog" data-testid="catalog"></section>
+        <nav aria-label="Catalog pagination"></nav>
+      </section>
     </main>
     <script>
       const config = {serialized};
@@ -345,6 +368,7 @@ def _catalog_html(config: dict[str, object]) -> str:
 
       async function loadPage(page) {{
         status.textContent = `Loading page ${{page}}...`;
+        status.dataset.state = 'loading';
         catalog.replaceChildren();
         nav.replaceChildren();
         const query = new URLSearchParams({{
@@ -380,6 +404,7 @@ def _catalog_html(config: dict[str, object]) -> str:
 
           catalog.appendChild(fragment);
           status.textContent = `Page ${{data.page}} loaded on attempt ${{data.attempt}}`;
+          status.dataset.state = 'success';
 
           if (data.page < data.total_pages) {{
             const next = document.createElement('button');
@@ -392,6 +417,7 @@ def _catalog_html(config: dict[str, object]) -> str:
         }} catch (error) {{
           status.textContent = `Catalog error: ${{error.message}}`;
           status.dataset.testid = 'catalog-error';
+          status.dataset.state = 'error';
         }}
       }}
 
