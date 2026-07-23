@@ -262,6 +262,12 @@ For a production-style .NET consumer with retries, checkpoints, cancellation,
 and browser evidence, see
 [resilient-browser-automation](https://github.com/bockuden/resilient-browser-automation).
 
+## Resilience Challenge
+
+Work through the four-level, reproducible
+[Resilience Challenge](CHALLENGE.md) to validate a consumer against success,
+transient recovery, login, DOM changes, duplicates, resume, and cancellation.
+
 ## Named scenario presets
 
 For repeated scenarios, the same values can be stored in a TOML file instead
