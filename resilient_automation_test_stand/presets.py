@@ -10,7 +10,6 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-
 Scenario = Literal[
     "success",
     "transient",
@@ -49,11 +48,7 @@ class PresetDocument(BaseModel):
         cls,
         presets: dict[str, ScenarioDefaults],
     ) -> dict[str, ScenarioDefaults]:
-        invalid = [
-            name
-            for name in presets
-            if re.fullmatch(r"[a-z0-9][a-z0-9._-]*", name) is None
-        ]
+        invalid = [name for name in presets if re.fullmatch(r"[a-z0-9][a-z0-9._-]*", name) is None]
         if invalid:
             raise ValueError(
                 "preset names must use lowercase letters, digits, '.', '_', or '-': "
@@ -91,6 +86,4 @@ def preset_url(
         (name, str(value).lower() if isinstance(value, bool) else str(value))
         for name, value in values.items()
     )
-    return urlunsplit(
-        (parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment)
-    )
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))

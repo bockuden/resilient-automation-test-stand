@@ -43,7 +43,10 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "httpx>=0.28,<1.0",
-  "pytest>=8.3,<9.0"
+  "pip-audit>=2.9,<3.0",
+  "pytest>=9.0.3,<10.0",
+  "pytest-cov>=6.0,<8.0",
+  "ruff>=0.12,<1.0",
 ]
 
 [project.scripts]
@@ -62,3 +65,19 @@ include = ["resilient_automation_test_stand*"]
 [tool.pytest.ini_options]
 addopts = "-q -p no:cacheprovider"
 testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["resilient_automation_test_stand"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

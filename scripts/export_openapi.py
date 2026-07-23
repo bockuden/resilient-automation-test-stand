@@ -7,7 +7,6 @@ import json
 import sys
 from pathlib import Path
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOT_PATH = REPOSITORY_ROOT / "docs" / "api" / "openapi.json"
 sys.path.insert(0, str(REPOSITORY_ROOT))
@@ -20,9 +19,7 @@ def rendered_schema() -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Export or verify docs/api/openapi.json."
-    )
+    parser = argparse.ArgumentParser(description="Export or verify docs/api/openapi.json.")
     parser.add_argument(
         "--check",
         action="store_true",

@@ -32,7 +32,18 @@ jobs:
           python -m pip install -e '.[dev]' build twine
 
       - name: Run tests
-        run: python -m pytest
+        run: python -m pytest --cov --cov-report=term-missing
+
+      - name: Lint and format check
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Audit Python dependencies
+        if: matrix.python-version == '3.13'
+        run: |
+          python scripts/export_audit_requirements.py /tmp/audit-requirements.txt
+          pip-audit --strict --requirement /tmp/audit-requirements.txt
 
       - name: Verify OpenAPI snapshot
         run: python scripts/export_openapi.py --check
@@ -53,12 +64,26 @@ jobs:
           /tmp/stand-sdist-test/bin/python -m pip install dist/*.tar.gz
           /tmp/stand-sdist-test/bin/automation-test-stand --help >/dev/null
 
+      - name: Validate a clean clone
+        if: matrix.python-version == '3.13'
+        shell: bash
+        run: |
+          git clone --depth=1 --no-local . /tmp/stand-clean-clone
+          cd /tmp/stand-clean-clone
+          python -m build --outdir /tmp/stand-clean-dist
+          python -m venv /tmp/stand-clean-install
+          /tmp/stand-clean-install/bin/python -m pip install /tmp/stand-clean-dist/*.whl
+          /tmp/stand-clean-install/bin/automation-test-stand --help >/dev/null
+
   docker:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+
+      - name: Verify Compose configuration
+        run: docker compose config --quiet
 
       - name: Build runtime image
         run: docker build --tag resilient-automation-test-stand:ci .

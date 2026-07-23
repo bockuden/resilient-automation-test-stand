@@ -112,7 +112,9 @@ async def login(
     if username != "demo" or password != "automation":
         raise HTTPException(status_code=401, detail="Invalid demo credentials")
 
-    safe_next = next_url if next_url.startswith("/") and not next_url.startswith("//") else "/catalog"
+    safe_next = (
+        next_url if next_url.startswith("/") and not next_url.startswith("//") else "/catalog"
+    )
     response = RedirectResponse(safe_next, status_code=303)
     response.set_cookie("demo_session", "authenticated", httponly=True, samesite="lax")
     return response
@@ -130,14 +132,37 @@ async def login(
     responses={303: {"description": "Protected catalog redirects to the demo login form."}},
 )
 async def catalog(
-    scenario: Scenario | None = Query(default=None, description="Scenario to execute; inherits the active preset when omitted."),
-    run_id: str = Query(default="manual", description="Opaque key that isolates deterministic attempt counters between test runs."),
-    fail_for: int | None = Query(default=None, ge=0, le=10, description="Initial transient failures per page."),
-    delay_ms: int | None = Query(default=None, ge=0, le=30_000, description="Response delay for the slow scenario, in milliseconds."),
-    failure_delay_ms: int | None = Query(default=None, ge=0, le=30_000, description="Delay before each transient 503 response, in milliseconds."),
-    fail_page: int | None = Query(default=None, ge=1, le=20, description="Permanently failing page in the resume scenario."),
-    total_pages: int | None = Query(default=None, ge=1, le=20, description="Number of pages exposed by the catalog."),
-    protected: bool | None = Query(default=None, description="Require the fixed demo login before serving the catalog shell."),
+    scenario: Scenario | None = Query(
+        default=None, description="Scenario to execute; inherits the active preset when omitted."
+    ),
+    run_id: str = Query(
+        default="manual",
+        description="Opaque key that isolates deterministic attempt counters between test runs.",
+    ),
+    fail_for: int | None = Query(
+        default=None, ge=0, le=10, description="Initial transient failures per page."
+    ),
+    delay_ms: int | None = Query(
+        default=None,
+        ge=0,
+        le=30_000,
+        description="Response delay for the slow scenario, in milliseconds.",
+    ),
+    failure_delay_ms: int | None = Query(
+        default=None,
+        ge=0,
+        le=30_000,
+        description="Delay before each transient 503 response, in milliseconds.",
+    ),
+    fail_page: int | None = Query(
+        default=None, ge=1, le=20, description="Permanently failing page in the resume scenario."
+    ),
+    total_pages: int | None = Query(
+        default=None, ge=1, le=20, description="Number of pages exposed by the catalog."
+    ),
+    protected: bool | None = Query(
+        default=None, description="Require the fixed demo login before serving the catalog shell."
+    ),
     demo_session: Annotated[str | None, Cookie()] = None,
 ) -> HTMLResponse:
     defaults = _resolved_defaults(
@@ -194,13 +219,34 @@ async def catalog(
 )
 async def catalog_api(
     page: int = Query(default=1, ge=1, le=20, description="One-based catalog page to fetch."),
-    scenario: Scenario | None = Query(default=None, description="Scenario to execute; inherits the active preset when omitted."),
-    run_id: str = Query(default="manual", description="Opaque key that isolates deterministic attempt counters between test runs."),
-    fail_for: int | None = Query(default=None, ge=0, le=10, description="Initial transient failures per page."),
-    delay_ms: int | None = Query(default=None, ge=0, le=30_000, description="Response delay for the slow scenario, in milliseconds."),
-    failure_delay_ms: int | None = Query(default=None, ge=0, le=30_000, description="Delay before each transient 503 response, in milliseconds."),
-    fail_page: int | None = Query(default=None, ge=1, le=20, description="Permanently failing page in the resume scenario."),
-    total_pages: int | None = Query(default=None, ge=1, le=20, description="Number of pages exposed by the catalog."),
+    scenario: Scenario | None = Query(
+        default=None, description="Scenario to execute; inherits the active preset when omitted."
+    ),
+    run_id: str = Query(
+        default="manual",
+        description="Opaque key that isolates deterministic attempt counters between test runs.",
+    ),
+    fail_for: int | None = Query(
+        default=None, ge=0, le=10, description="Initial transient failures per page."
+    ),
+    delay_ms: int | None = Query(
+        default=None,
+        ge=0,
+        le=30_000,
+        description="Response delay for the slow scenario, in milliseconds.",
+    ),
+    failure_delay_ms: int | None = Query(
+        default=None,
+        ge=0,
+        le=30_000,
+        description="Delay before each transient 503 response, in milliseconds.",
+    ),
+    fail_page: int | None = Query(
+        default=None, ge=1, le=20, description="Permanently failing page in the resume scenario."
+    ),
+    total_pages: int | None = Query(
+        default=None, ge=1, le=20, description="Number of pages exposed by the catalog."
+    ),
 ) -> CatalogPage:
     defaults = _resolved_defaults(
         scenario=scenario,
@@ -286,7 +332,7 @@ def _catalog_html(config: dict[str, object]) -> str:
   <body>
     <main>
       <h1>Deterministic demo catalog</h1>
-      <p id="scenario">Scenario: <strong>{escape(str(config['scenario']))}</strong></p>
+      <p id="scenario">Scenario: <strong>{escape(str(config["scenario"]))}</strong></p>
       <p id="status" role="status">Loading page 1...</p>
       <section id="catalog" data-testid="catalog"></section>
       <nav aria-label="Catalog pagination"></nav>

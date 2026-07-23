@@ -34,7 +34,7 @@ async def test_health(client: AsyncClient) -> None:
 async def test_catalog_page_loads_dynamic_shell(client: AsyncClient) -> None:
     response = await client.get("/catalog?scenario=success&run_id=test")
     assert response.status_code == 200
-    assert "data-testid=\"catalog\"" in response.text
+    assert 'data-testid="catalog"' in response.text
     assert "loadPage(1)" in response.text
 
 
@@ -50,12 +50,8 @@ async def test_transient_scenario_fails_twice_then_recovers(client: AsyncClient)
 
 @pytest.mark.anyio
 async def test_run_id_isolates_transient_attempt_counters(client: AsyncClient) -> None:
-    first_run = await client.get(
-        "/api/catalog?scenario=transient&run_id=first&page=1&fail_for=1"
-    )
-    second_run = await client.get(
-        "/api/catalog?scenario=transient&run_id=second&page=1&fail_for=1"
-    )
+    first_run = await client.get("/api/catalog?scenario=transient&run_id=first&page=1&fail_for=1")
+    second_run = await client.get("/api/catalog?scenario=transient&run_id=second&page=1&fail_for=1")
 
     assert first_run.status_code == 503
     assert second_run.status_code == 503
@@ -216,9 +212,7 @@ async def test_active_preset_supplies_request_defaults(client: AsyncClient) -> N
 async def test_query_parameters_override_only_selected_preset_fields(
     client: AsyncClient,
 ) -> None:
-    configure_scenario_defaults(
-        ScenarioDefaults(scenario="transient", total_pages=10, fail_for=3)
-    )
+    configure_scenario_defaults(ScenarioDefaults(scenario="transient", total_pages=10, fail_for=3))
 
     response = await client.get(
         "/api/catalog?run_id=preset-override&page=2&scenario=success&total_pages=2"

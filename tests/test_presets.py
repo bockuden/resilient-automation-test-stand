@@ -70,9 +70,7 @@ def test_preset_url_contains_complete_portable_scenario() -> None:
     parts = urlsplit(url)
     query = parse_qs(parts.query)
 
-    assert f"{parts.scheme}://{parts.netloc}{parts.path}" == (
-        "http://localhost:9090/catalog"
-    )
+    assert f"{parts.scheme}://{parts.netloc}{parts.path}" == ("http://localhost:9090/catalog")
     assert query["source"] == ["cli"]
     assert query["run_id"] == ["login-retry"]
     assert query["scenario"] == ["transient"]
