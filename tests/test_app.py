@@ -49,6 +49,40 @@ async def test_transient_scenario_fails_twice_then_recovers(client: AsyncClient)
 
 
 @pytest.mark.anyio
+async def test_run_id_isolates_transient_attempt_counters(client: AsyncClient) -> None:
+    first_run = await client.get(
+        "/api/catalog?scenario=transient&run_id=first&page=1&fail_for=1"
+    )
+    second_run = await client.get(
+        "/api/catalog?scenario=transient&run_id=second&page=1&fail_for=1"
+    )
+
+    assert first_run.status_code == 503
+    assert second_run.status_code == 503
+    assert first_run.json()["detail"] == {
+        "code": "TRANSIENT_CATALOG_FAILURE",
+        "attempt": 1,
+    }
+    assert first_run.headers["retry-after"] == "1"
+
+
+@pytest.mark.anyio
+async def test_catalog_api_rejects_page_outside_public_range(client: AsyncClient) -> None:
+    response = await client.get("/api/catalog?page=21")
+
+    assert response.status_code == 422
+
+
+def test_openapi_uses_stable_public_operation_ids() -> None:
+    paths = app.openapi()["paths"]
+
+    assert paths["/health"]["get"]["operationId"] == "get_health"
+    assert paths["/catalog"]["get"]["operationId"] == "get_catalog_shell"
+    assert paths["/api/catalog"]["get"]["operationId"] == "get_catalog_page"
+    assert paths["/login"]["post"]["operationId"] == "submit_demo_login"
+
+
+@pytest.mark.anyio
 async def test_duplicate_scenario_repeats_previous_page_item(client: AsyncClient) -> None:
     page_one = (await client.get("/api/catalog?scenario=duplicates&run_id=dupes&page=1")).json()
     page_two = (await client.get("/api/catalog?scenario=duplicates&run_id=dupes&page=2")).json()

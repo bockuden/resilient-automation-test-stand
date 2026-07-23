@@ -1,7 +1,7 @@
 {
   "components": {
     "schemas": {
-      "Body_login_login_post": {
+      "Body_submit_demo_login": {
         "properties": {
           "next_url": {
             "default": "/catalog",
@@ -21,20 +21,23 @@
           "username",
           "password"
         ],
-        "title": "Body_login_login_post",
+        "title": "Body_submit_demo_login",
         "type": "object"
       },
       "CatalogItem": {
         "properties": {
           "id": {
+            "description": "Stable deterministic item identifier.",
             "title": "Id",
             "type": "string"
           },
           "name": {
+            "description": "Deterministic display name for the item.",
             "title": "Name",
             "type": "string"
           },
           "price": {
+            "description": "Deterministic item price.",
             "title": "Price",
             "type": "number"
           }
@@ -50,10 +53,12 @@
       "CatalogPage": {
         "properties": {
           "attempt": {
+            "description": "One-based request attempt for this run, scenario, and page.",
             "title": "Attempt",
             "type": "integer"
           },
           "items": {
+            "description": "Items for the requested page.",
             "items": {
               "$ref": "#/components/schemas/CatalogItem"
             },
@@ -61,10 +66,12 @@
             "type": "array"
           },
           "page": {
+            "description": "One-based page that produced this response.",
             "title": "Page",
             "type": "integer"
           },
           "scenario": {
+            "description": "Resolved scenario name.",
             "enum": [
               "success",
               "transient",
@@ -78,6 +85,7 @@
             "type": "string"
           },
           "total_pages": {
+            "description": "Total pages exposed by the scenario.",
             "title": "Total Pages",
             "type": "integer"
           }
@@ -155,7 +163,8 @@
   "paths": {
     "/admin/reset": {
       "post": {
-        "operationId": "reset_admin_reset_post",
+        "description": "Test-only operation that clears all in-memory request-attempt counters.",
+        "operationId": "reset_attempt_counters",
         "responses": {
           "200": {
             "content": {
@@ -164,7 +173,7 @@
                   "additionalProperties": {
                     "type": "integer"
                   },
-                  "title": "Response Reset Admin Reset Post",
+                  "title": "Response Reset Attempt Counters",
                   "type": "object"
                 }
               }
@@ -172,19 +181,22 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Reset"
+        "summary": "Reset deterministic attempt counters"
       }
     },
     "/api/catalog": {
       "get": {
-        "operationId": "catalog_api_api_catalog_get",
+        "description": "Returns deterministic catalog data for retry, pagination, duplicate, delay, and checkpoint-recovery tests.",
+        "operationId": "get_catalog_page",
         "parameters": [
           {
+            "description": "One-based catalog page to fetch.",
             "in": "query",
             "name": "page",
             "required": false,
             "schema": {
               "default": 1,
+              "description": "One-based catalog page to fetch.",
               "maximum": 20,
               "minimum": 1,
               "title": "Page",
@@ -192,6 +204,7 @@
             }
           },
           {
+            "description": "Scenario to execute; inherits the active preset when omitted.",
             "in": "query",
             "name": "scenario",
             "required": false,
@@ -213,20 +226,24 @@
                   "type": "null"
                 }
               ],
+              "description": "Scenario to execute; inherits the active preset when omitted.",
               "title": "Scenario"
             }
           },
           {
+            "description": "Opaque key that isolates deterministic attempt counters between test runs.",
             "in": "query",
             "name": "run_id",
             "required": false,
             "schema": {
               "default": "manual",
+              "description": "Opaque key that isolates deterministic attempt counters between test runs.",
               "title": "Run Id",
               "type": "string"
             }
           },
           {
+            "description": "Initial transient failures per page.",
             "in": "query",
             "name": "fail_for",
             "required": false,
@@ -241,10 +258,12 @@
                   "type": "null"
                 }
               ],
+              "description": "Initial transient failures per page.",
               "title": "Fail For"
             }
           },
           {
+            "description": "Response delay for the slow scenario, in milliseconds.",
             "in": "query",
             "name": "delay_ms",
             "required": false,
@@ -259,10 +278,12 @@
                   "type": "null"
                 }
               ],
+              "description": "Response delay for the slow scenario, in milliseconds.",
               "title": "Delay Ms"
             }
           },
           {
+            "description": "Delay before each transient 503 response, in milliseconds.",
             "in": "query",
             "name": "failure_delay_ms",
             "required": false,
@@ -277,10 +298,12 @@
                   "type": "null"
                 }
               ],
+              "description": "Delay before each transient 503 response, in milliseconds.",
               "title": "Failure Delay Ms"
             }
           },
           {
+            "description": "Permanently failing page in the resume scenario.",
             "in": "query",
             "name": "fail_page",
             "required": false,
@@ -295,10 +318,12 @@
                   "type": "null"
                 }
               ],
+              "description": "Permanently failing page in the resume scenario.",
               "title": "Fail Page"
             }
           },
           {
+            "description": "Number of pages exposed by the catalog.",
             "in": "query",
             "name": "total_pages",
             "required": false,
@@ -313,6 +338,7 @@
                   "type": "null"
                 }
               ],
+              "description": "Number of pages exposed by the catalog.",
               "title": "Total Pages"
             }
           }
@@ -337,16 +363,24 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "description": "Permanent or checkpoint-resume scenario failure."
+          },
+          "503": {
+            "description": "Transient scenario failure; includes the Retry-After header."
           }
         },
-        "summary": "Catalog Api"
+        "summary": "Fetch one deterministic catalog page"
       }
     },
     "/catalog": {
       "get": {
-        "operationId": "catalog_catalog_get",
+        "description": "Renders a JavaScript catalog UI. Protected scenarios redirect to the demo login form. Use stable data-testid locators when automating this page.",
+        "operationId": "get_catalog_shell",
         "parameters": [
           {
+            "description": "Scenario to execute; inherits the active preset when omitted.",
             "in": "query",
             "name": "scenario",
             "required": false,
@@ -368,20 +402,24 @@
                   "type": "null"
                 }
               ],
+              "description": "Scenario to execute; inherits the active preset when omitted.",
               "title": "Scenario"
             }
           },
           {
+            "description": "Opaque key that isolates deterministic attempt counters between test runs.",
             "in": "query",
             "name": "run_id",
             "required": false,
             "schema": {
               "default": "manual",
+              "description": "Opaque key that isolates deterministic attempt counters between test runs.",
               "title": "Run Id",
               "type": "string"
             }
           },
           {
+            "description": "Initial transient failures per page.",
             "in": "query",
             "name": "fail_for",
             "required": false,
@@ -396,10 +434,12 @@
                   "type": "null"
                 }
               ],
+              "description": "Initial transient failures per page.",
               "title": "Fail For"
             }
           },
           {
+            "description": "Response delay for the slow scenario, in milliseconds.",
             "in": "query",
             "name": "delay_ms",
             "required": false,
@@ -414,10 +454,12 @@
                   "type": "null"
                 }
               ],
+              "description": "Response delay for the slow scenario, in milliseconds.",
               "title": "Delay Ms"
             }
           },
           {
+            "description": "Delay before each transient 503 response, in milliseconds.",
             "in": "query",
             "name": "failure_delay_ms",
             "required": false,
@@ -432,10 +474,12 @@
                   "type": "null"
                 }
               ],
+              "description": "Delay before each transient 503 response, in milliseconds.",
               "title": "Failure Delay Ms"
             }
           },
           {
+            "description": "Permanently failing page in the resume scenario.",
             "in": "query",
             "name": "fail_page",
             "required": false,
@@ -450,10 +494,12 @@
                   "type": "null"
                 }
               ],
+              "description": "Permanently failing page in the resume scenario.",
               "title": "Fail Page"
             }
           },
           {
+            "description": "Number of pages exposed by the catalog.",
             "in": "query",
             "name": "total_pages",
             "required": false,
@@ -468,10 +514,12 @@
                   "type": "null"
                 }
               ],
+              "description": "Number of pages exposed by the catalog.",
               "title": "Total Pages"
             }
           },
           {
+            "description": "Require the fixed demo login before serving the catalog shell.",
             "in": "query",
             "name": "protected",
             "required": false,
@@ -484,6 +532,7 @@
                   "type": "null"
                 }
               ],
+              "description": "Require the fixed demo login before serving the catalog shell.",
               "title": "Protected"
             }
           },
@@ -515,6 +564,9 @@
             },
             "description": "Successful Response"
           },
+          "303": {
+            "description": "Protected catalog redirects to the demo login form."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -526,12 +578,13 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Catalog"
+        "summary": "Render the browser catalog shell"
       }
     },
     "/health": {
       "get": {
-        "operationId": "health_health_get",
+        "description": "Returns a deterministic readiness response for container and service checks.",
+        "operationId": "get_health",
         "responses": {
           "200": {
             "content": {
@@ -540,7 +593,7 @@
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "title": "Response Health Health Get",
+                  "title": "Response Get Health",
                   "type": "object"
                 }
               }
@@ -548,12 +601,13 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Health"
+        "summary": "Check service health"
       }
     },
     "/login": {
       "get": {
-        "operationId": "login_form_login_get",
+        "description": "Renders the fixed-credential form used only by protected catalog scenarios.",
+        "operationId": "get_demo_login_form",
         "parameters": [
           {
             "in": "query",
@@ -588,28 +642,32 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Login Form"
+        "summary": "Render the demo login form"
       },
       "post": {
-        "operationId": "login_login_post",
+        "description": "Accepts the fixed demo credentials and redirects to a local catalog URL.",
+        "operationId": "submit_demo_login",
         "requestBody": {
           "content": {
             "application/x-www-form-urlencoded": {
               "schema": {
-                "$ref": "#/components/schemas/Body_login_login_post"
+                "$ref": "#/components/schemas/Body_submit_demo_login"
               }
             }
           },
           "required": true
         },
         "responses": {
-          "200": {
+          "303": {
             "content": {
               "application/json": {
                 "schema": {}
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "description": "The supplied demo credentials are invalid."
           },
           "422": {
             "content": {
@@ -622,7 +680,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Login"
+        "summary": "Authenticate to a protected demo catalog"
       }
     }
   }

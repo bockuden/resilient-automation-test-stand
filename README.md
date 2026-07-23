@@ -263,7 +263,9 @@ python scripts/export_openapi.py
 
 Contract changes require an updated snapshot, [release notes](CHANGELOG.md), a
 package version change, and a backward-compatibility review. The release
-roadmap is tracked in [the development plan](docs/development-plan.md).
+roadmap is tracked in [the development plan](docs/development-plan.md). The
+intended 1.0 public contract and compatibility policy are documented in
+[docs/compatibility.md](docs/compatibility.md).
 
 ## License
 
