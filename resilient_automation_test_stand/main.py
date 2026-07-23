@@ -13,7 +13,7 @@ from resilient_automation_test_stand.presets import Scenario, ScenarioDefaults
 
 app = FastAPI(
     title="Resilient Browser Automation Test Stand",
-    version="0.3.0",
+    version="0.4.0",
     docs_url="/api-docs",
 )
 app.state.scenario_defaults = ScenarioDefaults()

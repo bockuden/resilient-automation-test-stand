@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.0 - 2026-07-23
+
+### Added
+
+- Public 1.0 compatibility contract, stable OpenAPI operation IDs, and contract
+  tests for retry, pagination, login, and `run_id` isolation.
+- Release hardening: non-root container execution, clean-install package checks,
+  coverage, Ruff, dependency audit, and release checklist.
+- Contributor and security guidance, a browser-automation onboarding path,
+  transient-retry GIF, and the reproducible Resilience Challenge.
+- GitHub discoverability assets and metadata, including a social preview that
+  demonstrates transient `503`, DOM-change, and duplicate scenarios.
+
+### Compatibility
+
+This release preserves the 0.3 public API and CLI behavior. The 1.0 contract
+documents which current interfaces are stable and the compatibility guarantees
+that apply through 1.0.
+
 ## 0.3.0 - 2026-07-22
 
 ### Added
