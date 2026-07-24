@@ -16,6 +16,6 @@ body:
   - type: input
     attributes:
       label: Version or commit
-      placeholder: "0.4.0 or commit SHA"
+      placeholder: "1.0.0rc1 or commit SHA"
     validations:
       required: true

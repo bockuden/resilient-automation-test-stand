@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0rc1 - 2026-07-24
+
+### Release candidate
+
+- Feature freeze for the 1.0 contract published in 0.4.0.
+- C# consumer compatibility D1 completed against the exact published 0.4.0
+  stand, with no required changes to the stand; 0.5.0 is intentionally skipped.
+- This prerelease is intended for exact-version PyPI/GHCR verification and the
+  C# D2 compatibility gate. Only release-blocking fixes may follow before 1.0.0.
+
 ## 0.4.0 - 2026-07-23
 
 ### Added
