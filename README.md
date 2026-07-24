@@ -242,9 +242,7 @@ with sync_playwright() as playwright:
             expect(page.get_by_test_id("catalog-item").first).to_be_visible(timeout=2_000)
             break
         except PlaywrightTimeoutError:
-            expect(page.get_by_test_id("catalog-error")).to_contain_text(
-                "HTTP 503; retry-after=1"
-            )
+            expect(page.get_by_test_id("catalog-error")).to_contain_text("HTTP 503; retry-after=1")
             time.sleep(1)
             page.reload()
     else:
