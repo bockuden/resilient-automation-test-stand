@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.0 - 2026-07-25
+
+### Stable release
+
+- Promotes the externally verified `1.0.0rc1` candidate without API, CLI, or
+  scenario changes.
+- C# consumer compatibility D2 completed against the exact PyPI/GHCR release
+  candidate before this final release.
+
+### Compatibility
+
+The public 1.0 contract introduced in 0.4.0 is now stable. This release is
+compatible with 0.4.0 and 1.0.0rc1 consumers; no migration is required.
+
 ## 1.0.0rc1 - 2026-07-24
 
 ### Release candidate
