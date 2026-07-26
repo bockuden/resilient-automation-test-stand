@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "resilient-automation-test-stand"
-version = "1.0.0"
+version = "1.1.0"
 description = "A deterministic FastAPI target for browser automation integration tests"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -61,6 +61,9 @@ Changelog = "https://github.com/bockuden/resilient-automation-test-stand/blob/ma
 
 [tool.setuptools.packages.find]
 include = ["resilient_automation_test_stand*"]
+
+[tool.setuptools.package-data]
+resilient_automation_test_stand = ["static/*.css", "static/*.js"]
 
 [tool.pytest.ini_options]
 addopts = "-q -p no:cacheprovider"

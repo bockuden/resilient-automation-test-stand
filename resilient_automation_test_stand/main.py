@@ -2,19 +2,26 @@ import asyncio
 import json
 from collections import defaultdict
 from html import escape
+from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlencode
 
 from fastapi import Cookie, FastAPI, Form, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from resilient_automation_test_stand.presets import Scenario, ScenarioDefaults
 
 app = FastAPI(
     title="Resilient Browser Automation Test Stand",
-    version="1.0.0",
+    version="1.1.0",
     docs_url="/api-docs",
+)
+app.mount(
+    "/static",
+    StaticFiles(directory=Path(__file__).with_name("static")),
+    name="static",
 )
 app.state.scenario_defaults = ScenarioDefaults()
 
@@ -25,10 +32,10 @@ def configure_scenario_defaults(defaults: ScenarioDefaults) -> None:
     app.state.scenario_defaults = defaults
 
 
-def _resolved_defaults(**overrides: object | None) -> ScenarioDefaults:
+def _resolved_defaults(query: "CatalogQuery") -> ScenarioDefaults:
     current: ScenarioDefaults = app.state.scenario_defaults
     values = current.model_dump()
-    values.update({name: value for name, value in overrides.items() if value is not None})
+    values.update(query.model_dump(exclude_none=True, exclude={"page", "run_id"}))
     return ScenarioDefaults.model_validate(values)
 
 
@@ -44,6 +51,63 @@ class CatalogPage(BaseModel):
     items: list[CatalogItem] = Field(description="Items for the requested page.")
     scenario: Scenario = Field(description="Resolved scenario name.")
     attempt: int = Field(description="One-based request attempt for this run, scenario, and page.")
+
+
+class CatalogQuery(BaseModel):
+    scenario: Scenario | None = Field(
+        default=None,
+        description="Scenario to execute; inherits the active preset when omitted.",
+    )
+    run_id: str = Field(
+        default="manual",
+        description="Opaque key that isolates deterministic attempt counters between test runs.",
+    )
+    fail_for: int | None = Field(
+        default=None,
+        ge=0,
+        le=10,
+        description="Initial transient failures per page.",
+    )
+    delay_ms: int | None = Field(
+        default=None,
+        ge=0,
+        le=30_000,
+        description="Response delay for the slow scenario, in milliseconds.",
+    )
+    failure_delay_ms: int | None = Field(
+        default=None,
+        ge=0,
+        le=30_000,
+        description="Delay before each transient 503 response, in milliseconds.",
+    )
+    fail_page: int | None = Field(
+        default=None,
+        ge=1,
+        le=20,
+        description="Permanently failing page in the resume scenario.",
+    )
+    total_pages: int | None = Field(
+        default=None,
+        ge=1,
+        le=20,
+        description="Number of pages exposed by the catalog.",
+    )
+
+
+class CatalogShellQuery(CatalogQuery):
+    protected: bool | None = Field(
+        default=None,
+        description="Require the fixed demo login before serving the catalog shell.",
+    )
+
+
+class CatalogApiQuery(CatalogQuery):
+    page: int = Field(
+        default=1,
+        ge=1,
+        le=20,
+        description="One-based catalog page to fetch.",
+    )
 
 
 @app.get(
@@ -132,54 +196,16 @@ async def login(
     responses={303: {"description": "Protected catalog redirects to the demo login form."}},
 )
 async def catalog(
-    scenario: Scenario | None = Query(
-        default=None, description="Scenario to execute; inherits the active preset when omitted."
-    ),
-    run_id: str = Query(
-        default="manual",
-        description="Opaque key that isolates deterministic attempt counters between test runs.",
-    ),
-    fail_for: int | None = Query(
-        default=None, ge=0, le=10, description="Initial transient failures per page."
-    ),
-    delay_ms: int | None = Query(
-        default=None,
-        ge=0,
-        le=30_000,
-        description="Response delay for the slow scenario, in milliseconds.",
-    ),
-    failure_delay_ms: int | None = Query(
-        default=None,
-        ge=0,
-        le=30_000,
-        description="Delay before each transient 503 response, in milliseconds.",
-    ),
-    fail_page: int | None = Query(
-        default=None, ge=1, le=20, description="Permanently failing page in the resume scenario."
-    ),
-    total_pages: int | None = Query(
-        default=None, ge=1, le=20, description="Number of pages exposed by the catalog."
-    ),
-    protected: bool | None = Query(
-        default=None, description="Require the fixed demo login before serving the catalog shell."
-    ),
+    query: Annotated[CatalogShellQuery, Query()],
     demo_session: Annotated[str | None, Cookie()] = None,
 ) -> HTMLResponse:
-    defaults = _resolved_defaults(
-        scenario=scenario,
-        protected=protected,
-        total_pages=total_pages,
-        fail_for=fail_for,
-        failure_delay_ms=failure_delay_ms,
-        delay_ms=delay_ms,
-        fail_page=fail_page,
-    )
+    defaults = _resolved_defaults(query)
 
     if defaults.protected and demo_session != "authenticated":
         target_query = urlencode(
             {
                 "scenario": defaults.scenario,
-                "run_id": run_id,
+                "run_id": query.run_id,
                 "fail_for": defaults.fail_for,
                 "delay_ms": defaults.delay_ms,
                 "failure_delay_ms": defaults.failure_delay_ms,
@@ -193,7 +219,7 @@ async def catalog(
 
     config = {
         "scenario": defaults.scenario,
-        "runId": run_id,
+        "runId": query.run_id,
         "failFor": defaults.fail_for,
         "delayMs": defaults.delay_ms,
         "failureDelayMs": defaults.failure_delay_ms,
@@ -218,45 +244,10 @@ async def catalog(
     },
 )
 async def catalog_api(
-    page: int = Query(default=1, ge=1, le=20, description="One-based catalog page to fetch."),
-    scenario: Scenario | None = Query(
-        default=None, description="Scenario to execute; inherits the active preset when omitted."
-    ),
-    run_id: str = Query(
-        default="manual",
-        description="Opaque key that isolates deterministic attempt counters between test runs.",
-    ),
-    fail_for: int | None = Query(
-        default=None, ge=0, le=10, description="Initial transient failures per page."
-    ),
-    delay_ms: int | None = Query(
-        default=None,
-        ge=0,
-        le=30_000,
-        description="Response delay for the slow scenario, in milliseconds.",
-    ),
-    failure_delay_ms: int | None = Query(
-        default=None,
-        ge=0,
-        le=30_000,
-        description="Delay before each transient 503 response, in milliseconds.",
-    ),
-    fail_page: int | None = Query(
-        default=None, ge=1, le=20, description="Permanently failing page in the resume scenario."
-    ),
-    total_pages: int | None = Query(
-        default=None, ge=1, le=20, description="Number of pages exposed by the catalog."
-    ),
+    query: Annotated[CatalogApiQuery, Query()],
 ) -> CatalogPage:
-    defaults = _resolved_defaults(
-        scenario=scenario,
-        total_pages=total_pages,
-        fail_for=fail_for,
-        failure_delay_ms=failure_delay_ms,
-        delay_ms=delay_ms,
-        fail_page=fail_page,
-    )
-    key = (run_id, defaults.scenario, page)
+    defaults = _resolved_defaults(query)
+    key = (query.run_id, defaults.scenario, query.page)
     request_attempts[key] += 1
     attempt = request_attempts[key]
 
@@ -275,19 +266,19 @@ async def catalog_api(
             detail={"code": "PERMANENT_CATALOG_FAILURE", "attempt": attempt},
         )
 
-    if defaults.scenario == "resume" and page == defaults.fail_page:
+    if defaults.scenario == "resume" and query.page == defaults.fail_page:
         raise HTTPException(
             status_code=500,
-            detail={"code": "CHECKPOINT_RESUME_FAILURE", "page": page, "attempt": attempt},
+            detail={"code": "CHECKPOINT_RESUME_FAILURE", "page": query.page, "attempt": attempt},
         )
 
     if defaults.scenario == "slow":
         await asyncio.sleep(defaults.delay_ms / 1000)
 
     return CatalogPage(
-        page=page,
+        page=query.page,
         total_pages=defaults.total_pages,
-        items=_items_for_page(page, defaults.scenario, defaults.total_pages),
+        items=_items_for_page(query.page, defaults.scenario, defaults.total_pages),
         scenario=defaults.scenario,
         attempt=attempt,
     )
@@ -321,30 +312,7 @@ def _catalog_html(config: dict[str, object]) -> str:
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Deterministic demo catalog</title>
-    <style>
-      :root {{ color: #e6edf7; background: #0b1220; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }}
-      * {{ box-sizing: border-box; }}
-      body {{ margin: 0; min-width: 320px; background: radial-gradient(circle at 15% -10%, #203f6d 0, transparent 35%), #0b1220; }}
-      main {{ width: min(100% - 2rem, 1100px); margin: 0 auto; padding: 3.5rem 0 4rem; }}
-      .hero {{ display: grid; gap: .9rem; max-width: 720px; }}
-      .eyebrow {{ width: fit-content; padding: .35rem .65rem; border: 1px solid #4279bc; border-radius: 999px; color: #a8cdfd; font-size: .75rem; font-weight: 750; letter-spacing: .08em; }}
-      h1 {{ margin: 0; color: #fff; font-size: clamp(2.35rem, 7vw, 4.5rem); line-height: .98; letter-spacing: -.055em; }}
-      .lede {{ max-width: 620px; margin: 0; color: #b9c8dc; font-size: 1.1rem; line-height: 1.6; }}
-      .scenario-pill {{ width: fit-content; margin: .4rem 0 1.8rem; padding: .6rem .8rem; border: 1px solid #334d70; border-radius: .6rem; background: #121e30; color: #a9b9d0; }}
-      .scenario-pill strong {{ color: #7dd3fc; }}
-      .workspace {{ padding: 1.2rem; border: 1px solid #263c5a; border-radius: 1.25rem; background: rgba(16, 28, 46, .9); box-shadow: 0 24px 70px rgba(0, 0, 0, .28); }}
-      #status {{ min-height: 3.5rem; margin: 0 0 1.2rem; padding: .9rem 1rem; border: 1px solid #355374; border-radius: .8rem; background: #102038; color: #d9e9fb; font-weight: 650; }}
-      #status[data-state="error"] {{ border-color: #a85454; background: #351b27; color: #ffd5d5; }}
-      #status[data-state="success"] {{ border-color: #237a69; background: #10342f; color: #c5f5e8; }}
-      #catalog {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 1rem; }}
-      [data-testid="catalog-item"] {{ min-height: 152px; padding: 1.1rem; border: 1px solid #315072; border-radius: .95rem; background: linear-gradient(145deg, #172a45, #102039); box-shadow: inset 0 1px rgba(255, 255, 255, .04); }}
-      [data-testid="catalog-item"] h2, [data-testid="item-name"] {{ display: block; margin: 0 0 2.1rem; color: #f3f8ff; font-size: 1rem; line-height: 1.35; }}
-      [data-testid="item-price"] {{ color: #7dd3fc; font-size: 1.55rem; font-weight: 780; }}
-      nav {{ display: flex; justify-content: flex-end; margin-top: 1.25rem; }}
-      button {{ padding: .75rem 1rem; border: 0; border-radius: .65rem; background: #38bdf8; color: #082033; font: inherit; font-weight: 800; cursor: pointer; }}
-      button:hover {{ background: #7dd3fc; }}
-      @media (max-width: 600px) {{ main {{ width: min(100% - 1.25rem, 1100px); padding-top: 2rem; }} .workspace {{ padding: .8rem; }} }}
-    </style>
+    <link rel="stylesheet" href="/static/catalog.css">
   </head>
   <body>
     <main>
@@ -360,69 +328,8 @@ def _catalog_html(config: dict[str, object]) -> str:
         <nav aria-label="Catalog pagination"></nav>
       </section>
     </main>
-    <script>
-      const config = {serialized};
-      const catalog = document.querySelector('#catalog');
-      const status = document.querySelector('#status');
-      const nav = document.querySelector('nav');
-
-      async function loadPage(page) {{
-        status.textContent = `Loading page ${{page}}...`;
-        status.dataset.state = 'loading';
-        catalog.replaceChildren();
-        nav.replaceChildren();
-        const query = new URLSearchParams({{
-          page,
-          scenario: config.scenario,
-          run_id: config.runId,
-          fail_for: config.failFor,
-          delay_ms: config.delayMs,
-          failure_delay_ms: config.failureDelayMs,
-          fail_page: config.failPage,
-          total_pages: config.totalPages,
-        }});
-
-        try {{
-          const response = await fetch(`/api/catalog?${{query}}`);
-          if (!response.ok) {{
-            const retryAfter = response.headers.get('Retry-After');
-            throw new Error(`HTTP ${{response.status}}${{retryAfter ? `; retry-after=${{retryAfter}}` : ''}}`);
-          }}
-          const data = await response.json();
-          const fragment = document.createDocumentFragment();
-
-          for (const item of data.items) {{
-            const outer = document.createElement(config.scenario === 'dom-change' ? 'article' : 'div');
-            outer.className = config.scenario === 'dom-change' ? 'result-tile-v2' : 'product-card';
-            outer.dataset.testid = 'catalog-item';
-            outer.dataset.itemId = item.id;
-            outer.innerHTML = config.scenario === 'dom-change'
-              ? `<div class="content"><span data-testid="item-name">${{item.name}}</span><strong data-testid="item-price">${{item.price.toFixed(2)}}</strong></div>`
-              : `<h2 data-testid="item-name">${{item.name}}</h2><span data-testid="item-price">${{item.price.toFixed(2)}}</span>`;
-            fragment.appendChild(outer);
-          }}
-
-          catalog.appendChild(fragment);
-          status.textContent = `Page ${{data.page}} loaded on attempt ${{data.attempt}}`;
-          status.dataset.state = 'success';
-
-          if (data.page < data.total_pages) {{
-            const next = document.createElement('button');
-            next.type = 'button';
-            next.dataset.testid = 'next-page';
-            next.textContent = 'Next page';
-            next.addEventListener('click', () => loadPage(data.page + 1));
-            nav.appendChild(next);
-          }}
-        }} catch (error) {{
-          status.textContent = `Catalog error: ${{error.message}}`;
-          status.dataset.testid = 'catalog-error';
-          status.dataset.state = 'error';
-        }}
-      }}
-
-      loadPage(1);
-    </script>
+    <script id="catalog-config" type="application/json">{serialized}</script>
+    <script src="/static/catalog.js" defer></script>
   </body>
 </html>
 """

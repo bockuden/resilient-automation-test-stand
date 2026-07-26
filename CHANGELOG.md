@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.1.0 - 2026-07-26
+
+### Changed
+
+- Consolidated the shared `/catalog` and `/api/catalog` query parsing into
+  Pydantic query models while preserving the published parameter contract.
+- Moved catalog CSS and browser JavaScript into package-local static assets.
+  The catalog URL, rendered structure, and stable `data-testid` locators are
+  unchanged.
+
+### Compatibility
+
+This release is compatible with 1.0.0 consumers. Existing catalog URLs,
+OpenAPI operation IDs, query parameter names, defaults, and constraints remain
+stable.
+
 ## 1.0.0 - 2026-07-25
 
 ### Stable release

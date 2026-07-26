@@ -35,7 +35,20 @@ async def test_catalog_page_loads_dynamic_shell(client: AsyncClient) -> None:
     response = await client.get("/catalog?scenario=success&run_id=test")
     assert response.status_code == 200
     assert 'data-testid="catalog"' in response.text
-    assert "loadPage(1)" in response.text
+    assert 'href="/static/catalog.css"' in response.text
+    assert 'src="/static/catalog.js"' in response.text
+    assert 'id="catalog-config"' in response.text
+
+
+@pytest.mark.anyio
+async def test_catalog_static_assets_are_served(client: AsyncClient) -> None:
+    stylesheet = await client.get("/static/catalog.css")
+    script = await client.get("/static/catalog.js")
+
+    assert stylesheet.status_code == 200
+    assert "[data-testid=\"catalog-item\"]" in stylesheet.text
+    assert script.status_code == 200
+    assert "async function loadPage(page)" in script.text
 
 
 @pytest.mark.anyio
@@ -76,6 +89,45 @@ def test_openapi_uses_stable_public_operation_ids() -> None:
     assert paths["/catalog"]["get"]["operationId"] == "get_catalog_shell"
     assert paths["/api/catalog"]["get"]["operationId"] == "get_catalog_page"
     assert paths["/login"]["post"]["operationId"] == "submit_demo_login"
+
+
+def test_openapi_preserves_catalog_query_parameter_contract() -> None:
+    paths = app.openapi()["paths"]
+
+    catalog_parameters = {
+        parameter["name"]: parameter
+        for parameter in paths["/catalog"]["get"]["parameters"]
+        if parameter["in"] == "query"
+    }
+    api_parameters = {
+        parameter["name"]: parameter
+        for parameter in paths["/api/catalog"]["get"]["parameters"]
+        if parameter["in"] == "query"
+    }
+
+    common_parameters = {
+        "scenario",
+        "run_id",
+        "fail_for",
+        "delay_ms",
+        "failure_delay_ms",
+        "fail_page",
+        "total_pages",
+    }
+    assert set(catalog_parameters) == common_parameters | {"protected"}
+    assert set(api_parameters) == common_parameters | {"page"}
+    assert catalog_parameters["run_id"]["schema"]["default"] == "manual"
+    assert api_parameters["page"]["schema"] == {
+        "type": "integer",
+        "maximum": 20,
+        "minimum": 1,
+        "description": "One-based catalog page to fetch.",
+        "default": 1,
+        "title": "Page",
+    }
+    assert catalog_parameters["protected"]["schema"]["description"] == (
+        "Require the fixed demo login before serving the catalog shell."
+    )
 
 
 @pytest.mark.anyio

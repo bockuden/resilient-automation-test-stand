@@ -157,7 +157,7 @@
   },
   "info": {
     "title": "Resilient Browser Automation Test Stand",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -189,20 +189,6 @@
         "description": "Returns deterministic catalog data for retry, pagination, duplicate, delay, and checkpoint-recovery tests.",
         "operationId": "get_catalog_page",
         "parameters": [
-          {
-            "description": "One-based catalog page to fetch.",
-            "in": "query",
-            "name": "page",
-            "required": false,
-            "schema": {
-              "default": 1,
-              "description": "One-based catalog page to fetch.",
-              "maximum": 20,
-              "minimum": 1,
-              "title": "Page",
-              "type": "integer"
-            }
-          },
           {
             "description": "Scenario to execute; inherits the active preset when omitted.",
             "in": "query",
@@ -340,6 +326,20 @@
               ],
               "description": "Number of pages exposed by the catalog.",
               "title": "Total Pages"
+            }
+          },
+          {
+            "description": "One-based catalog page to fetch.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "One-based catalog page to fetch.",
+              "maximum": 20,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
             }
           }
         ],
