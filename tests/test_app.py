@@ -46,7 +46,7 @@ async def test_catalog_static_assets_are_served(client: AsyncClient) -> None:
     script = await client.get("/static/catalog.js")
 
     assert stylesheet.status_code == 200
-    assert "[data-testid=\"catalog-item\"]" in stylesheet.text
+    assert '[data-testid="catalog-item"]' in stylesheet.text
     assert script.status_code == 200
     assert "async function loadPage(page)" in script.text
 
