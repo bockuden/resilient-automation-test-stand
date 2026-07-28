@@ -13,7 +13,7 @@ Unlike a static mock endpoint, it ships browser and API workflows with
 deterministic stateful failures, stable locators, login, and pagination.
 
 [Try the Resilience Challenge](https://github.com/bockuden/resilient-automation-test-stand/blob/main/CHALLENGE.md)
-· [See the C# reference consumer](https://github.com/bockuden/resilient-browser-automation)
+· [See the C# reference consumer for a production-style worker that is validated against a pinned Test Stand release.](https://github.com/bockuden/resilient-browser-automation)
 · [Read the public compatibility contract](https://github.com/bockuden/resilient-automation-test-stand/blob/main/docs/compatibility.md)
 
 ## Start in minutes
