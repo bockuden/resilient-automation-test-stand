@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.1.2 - 2026-07-28
+
+### Changed
+
+- Reworked the top of the README around independent PyPI and versioned-container
+  quick starts, a copy-ready transient scenario, and clearer product
+  positioning for browser automation.
+- Added direct links to the Resilience Challenge, C# reference consumer, and
+  compatibility contract, plus a concise WireMock and Toxiproxy comparison.
+- Moved editable installation and Docker Compose instructions into the
+  development-only setup.
+
+### Compatibility
+
+This is a documentation-only release. HTTP behavior, CLI options, scenario
+semantics, browser locators, and package requirements are unchanged.
+
 ## 1.1.1 - 2026-07-28
 
 ### Changed

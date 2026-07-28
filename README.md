@@ -1,39 +1,51 @@
 # Resilient Automation Test Stand
 
 [![Build and test](https://github.com/bockuden/resilient-automation-test-stand/actions/workflows/tests.yml/badge.svg)](https://github.com/bockuden/resilient-automation-test-stand/actions/workflows/tests.yml)
+[![PyPI](https://img.shields.io/pypi/v/resilient-automation-test-stand.svg)](https://pypi.org/project/resilient-automation-test-stand/)
 [![Python 3.11–3.13](https://img.shields.io/badge/python-3.11%E2%80%933.13-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-Test whether browser automation recovers from real, repeatable failures—not
-just happy-path responses. This FastAPI stand supplies deterministic retries,
-pagination, login, DOM changes, duplicates, cancellation, and resume cases for
-Playwright, Selenium, and any HTTP-aware worker.
+A ready-to-run deterministic failure sandbox for browser automation.
 
-The stand is deliberately stateful within one process: retry counters are
-isolated by `run_id` and can be reset between test cases. It is test
-infrastructure and is not intended to serve production traffic.
+Use it to prove that Playwright, Selenium, scrapers, and HTTP automation workers
+recover from real, repeatable failure sequences—not just happy-path responses.
+Unlike a static mock endpoint, it ships browser and API workflows with
+deterministic stateful failures, stable locators, login, and pagination.
 
-## Run a failure-and-recovery scenario in three commands
+[Try the Resilience Challenge](https://github.com/bockuden/resilient-automation-test-stand/blob/main/CHALLENGE.md)
+· [See the C# reference consumer](https://github.com/bockuden/resilient-browser-automation)
+· [Read the public compatibility contract](https://github.com/bockuden/resilient-automation-test-stand/blob/main/docs/compatibility.md)
+
+## Start in minutes
+
+These two paths work without cloning this repository.
+
+### Install from PyPI
+
+Requires Python 3.11 or newer.
 
 ```bash
-docker compose up --build --detach --wait
+python -m pip install resilient-automation-test-stand
+automation-test-stand --port 8080
 ```
 
-Open the following URL in a browser or let an automation worker navigate to it:
+### Run the released container
+
+```bash
+docker run --rm -p 8080:8080 \
+  ghcr.io/bockuden/resilient-automation-test-stand:1.1.2
+```
+
+After starting either distribution, open this URL in a browser or navigate to
+it with an automation worker:
 
 ```text
-http://localhost:8080/catalog?scenario=transient&run_id=readme-demo&fail_for=2
+http://localhost:8080/catalog?scenario=transient&run_id=demo&fail_for=2
 ```
 
-Then stop the stand:
-
-```bash
-docker compose down
-```
-
-The first two catalog API requests return `503` and `Retry-After: 1`; later
-requests for the same `run_id` succeed. Use a new `run_id` for an independent
-test run.
+The consumer—not the stand—owns the retry policy. The first two catalog API
+requests for this `run_id` return `503` with `Retry-After: 1`; the third
+succeeds. Use a new `run_id` for a clean, independent failure sequence.
 
 ![A real transient scenario: two 503 responses with Retry-After, then a successful catalog load](docs/assets/transient-retry.gif)
 
@@ -47,11 +59,18 @@ test run.
   third-party website.
 - Educators teaching resilient automation without depending on a live site.
 
-## Why not use an ordinary mock server?
+## Why not WireMock or Toxiproxy?
 
 An ordinary mock often returns one static response. This stand keeps a small,
 isolated state machine per `run_id`, so a consumer has to prove its behavior
 across an ordered sequence of requests.
+
+[WireMock](https://wiremock.org/docs/stateful-behaviour/) is the better fit
+when you need arbitrary mappings and custom state machines.
+[Toxiproxy](https://github.com/Shopify/toxiproxy) is the better fit for
+transport-level latency, connection cuts, and bandwidth faults. Choose this
+stand when you want a ready-made browser and API workflow with login,
+pagination, stable locators, and deterministic recovery cases.
 
 | Failure mode | What a consumer can prove |
 | --- | --- |
@@ -61,9 +80,10 @@ across an ordered sequence of requests.
 | `duplicates` | It deduplicates items across pagination boundaries. |
 | `protected` | It preserves the demo login session and return URL. |
 
-## Quick start with Python
+## Development setup
 
-Requirements: Python 3.11 or newer.
+Use this section after cloning the repository. Requirements: Python 3.11 or
+newer.
 
 Only virtual-environment creation and activation differ by platform.
 
@@ -95,7 +115,7 @@ The module entry point is equivalent on every platform:
 python -m resilient_automation_test_stand --port 8080
 ```
 
-## Docker Compose details
+### Docker Compose
 
 These commands are the same in PowerShell, Linux shells, and macOS Terminal:
 
