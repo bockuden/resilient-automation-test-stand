@@ -168,6 +168,20 @@ async def test_login_sets_session_cookie(client: AsyncClient) -> None:
 
 
 @pytest.mark.anyio
+async def test_login_form_uses_the_catalog_visual_system(client: AsyncClient) -> None:
+    response = await client.get("/login?next_url=/catalog%3Fprotected%3Dtrue")
+
+    assert response.status_code == 200
+    assert 'href="/static/catalog.css"' in response.text
+    assert 'class="hero login-hero"' in response.text
+    assert 'class="workspace login-workspace"' in response.text
+    assert 'class="login-form"' in response.text
+    assert 'id="username" name="username"' in response.text
+    assert 'id="password" name="password" type="password"' in response.text
+    assert 'name="next_url" value="/catalog?protected=true"' in response.text
+
+
+@pytest.mark.anyio
 async def test_login_returns_to_configured_ten_page_catalog(client: AsyncClient) -> None:
     protected = await client.get(
         "/catalog?protected=true&scenario=transient&run_id=login-flow&total_pages=10"

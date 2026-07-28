@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.1 - 2026-07-28
+
+### Changed
+
+- Restyled the demo login page to use the catalog's visual system, with a
+  responsive dark workspace, accessible labelled fields, focus states, and
+  visible fixed demo credentials.
+
+### Compatibility
+
+The login endpoint, form field names, fixed credentials, return-URL handling,
+and session-cookie behavior are unchanged.
+
 ## 1.1.0 - 2026-07-26
 
 ### Changed

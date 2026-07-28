@@ -26,6 +26,10 @@ main {
   gap: 0.9rem;
 }
 
+.login-hero {
+  max-width: 620px;
+}
+
 .eyebrow {
   width: fit-content;
   padding: 0.35rem 0.65rem;
@@ -73,6 +77,70 @@ h1 {
   border-radius: 1.25rem;
   background: rgb(16 28 46 / 90%);
   box-shadow: 0 24px 70px rgb(0 0 0 / 28%);
+}
+
+.login-workspace {
+  display: grid;
+  max-width: 620px;
+  gap: 1.5rem;
+}
+
+.login-intro h2 {
+  margin: 0 0 0.45rem;
+  color: #f3f8ff;
+  font-size: 1.25rem;
+}
+
+.login-intro p,
+.login-hint {
+  margin: 0;
+  color: #a9b9d0;
+  line-height: 1.55;
+}
+
+.login-form {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.login-form label {
+  color: #d9e9fb;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.login-form input {
+  width: 100%;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #355374;
+  border-radius: 0.65rem;
+  outline: 0;
+  background: #102038;
+  color: #f3f8ff;
+  font: inherit;
+}
+
+.login-form input:focus {
+  border-color: #7dd3fc;
+  box-shadow: 0 0 0 3px rgb(56 189 248 / 22%);
+}
+
+.login-form button {
+  width: fit-content;
+  margin-top: 0.55rem;
+}
+
+.login-hint {
+  padding-top: 1rem;
+  border-top: 1px solid #263c5a;
+}
+
+code {
+  padding: 0.12rem 0.32rem;
+  border-radius: 0.3rem;
+  background: #102038;
+  color: #7dd3fc;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
 #status {

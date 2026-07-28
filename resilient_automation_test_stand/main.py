@@ -15,7 +15,7 @@ from resilient_automation_test_stand.presets import Scenario, ScenarioDefaults
 
 app = FastAPI(
     title="Resilient Browser Automation Test Stand",
-    version="1.1.0",
+    version="1.1.1",
     docs_url="/api-docs",
 )
 app.mount(
@@ -144,16 +144,34 @@ async def login_form(next_url: str = "/catalog") -> str:
     return f"""
 <!doctype html>
 <html lang="en">
-  <head><meta charset="utf-8"><title>Demo login</title></head>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Demo login | Resilient Automation Test Stand</title>
+    <link rel="stylesheet" href="/static/catalog.css">
+  </head>
   <body>
     <main>
-      <h1>Demo login</h1>
-      <form method="post" action="/login">
-        <input type="hidden" name="next_url" value="{safe_next}">
-        <label>Username <input name="username" autocomplete="username"></label>
-        <label>Password <input name="password" type="password" autocomplete="current-password"></label>
-        <button type="submit">Sign in</button>
-      </form>
+      <header class="hero login-hero">
+        <span class="eyebrow">RESILIENCE TEST TARGET</span>
+        <h1>Demo login</h1>
+        <p class="lede">Sign in to continue the protected catalog scenario.</p>
+      </header>
+      <section class="workspace login-workspace" aria-labelledby="login-title">
+        <div class="login-intro">
+          <h2 id="login-title">Continue your test run</h2>
+          <p>Use the fixed demo credentials to preserve the catalog return URL.</p>
+        </div>
+        <form class="login-form" method="post" action="/login">
+          <input type="hidden" name="next_url" value="{safe_next}">
+          <label for="username">Username</label>
+          <input id="username" name="username" autocomplete="username" required>
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+          <button type="submit">Sign in</button>
+        </form>
+        <p class="login-hint">Demo credentials: <code>demo</code> / <code>automation</code></p>
+      </section>
     </main>
   </body>
 </html>
