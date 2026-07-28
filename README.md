@@ -33,7 +33,7 @@ automation-test-stand --port 8080
 
 ```bash
 docker run --rm -p 8080:8080 \
-  ghcr.io/bockuden/resilient-automation-test-stand:1.1.4
+  ghcr.io/bockuden/resilient-automation-test-stand:1.1.5
 ```
 
 After starting either distribution, open this URL in a browser or navigate to
@@ -239,54 +239,59 @@ The delayed transient example waits 1.5 seconds before each of the first two
 reloaded; an automation worker can exercise its retry policy and recover on the
 third attempt.
 
-## Python Playwright: retry a transient browser scenario
+## Runnable resilience examples
 
-Install the Python Playwright package and browser once, then run this while the
-Compose service above is running:
+Start the stand first. Each example generates a fresh `run_id` unless one is
+provided, prints reproducible JSON evidence, and exits nonzero when the expected
+behavior is not proved.
+
+### Playwright: login and bounded browser retries
+
+Install the optional browser dependency once, then run the
+[standalone Playwright example](https://github.com/bockuden/resilient-automation-test-stand/blob/main/resilient_automation_test_stand/examples/playwright_resilience.py):
 
 ```bash
 python -m pip install playwright
 playwright install chromium
+python -m resilient_automation_test_stand.examples.playwright_resilience
 ```
 
-```python
-import time
+The script logs in with the fixed demo account, reads `Retry-After`, performs at
+most three browser attempts, and asserts five items on recovery.
 
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
-from playwright.sync_api import expect, sync_playwright
+### HTTP API: retry, pagination, and deduplication
 
-url = (
-    "http://localhost:8080/catalog?scenario=transient"
-    "&protected=true&run_id=playwright-readme&fail_for=2"
-)
+The [standard-library API example](https://github.com/bockuden/resilient-automation-test-stand/blob/main/resilient_automation_test_stand/examples/api_retry_dedup.py)
+needs no additional dependency:
 
-with sync_playwright() as playwright:
-    browser = playwright.chromium.launch()
-    page = browser.new_page()
-    page.goto(url)
-    page.get_by_label("Username").fill("demo")
-    page.get_by_label("Password").fill("automation")
-    with page.expect_navigation():
-        page.get_by_role("button", name="Sign in").click()
-
-    for attempt in range(1, 4):
-        try:
-            expect(page.get_by_test_id("catalog-item").first).to_be_visible(timeout=2_000)
-            break
-        except PlaywrightTimeoutError:
-            expect(page.get_by_test_id("catalog-error")).to_contain_text("HTTP 503; retry-after=1")
-            time.sleep(1)
-            page.reload()
-    else:
-        raise RuntimeError("The transient scenario did not recover within its retry budget")
-
-    expect(page.get_by_test_id("catalog-item")).to_have_count(5)
-    browser.close()
+```bash
+python -m resilient_automation_test_stand.examples.api_retry_dedup
 ```
 
-The stand does not retry for the consumer: the example makes the retry budget
-and `Retry-After` wait explicit, then proves that the third browser load
-recovers.
+It first completes three transient pages with a bounded retry budget, then
+collects the duplicate scenario and reports raw, unique, and removed item IDs.
+
+### Checkpoint and resume
+
+The first invocation intentionally stops with a nonzero exit code on page 3 and
+leaves a checkpoint containing the ten items from pages 1 and 2:
+
+```bash
+python -m resilient_automation_test_stand.examples.resume_checkpoint \
+  --checkpoint .tmp/resume-example.json
+```
+
+After the simulated dependency recovers, run the same consumer against the
+success scenario. It reads the checkpoint and requests only pages 3 and 4:
+
+```bash
+python -m resilient_automation_test_stand.examples.resume_checkpoint \
+  --scenario success \
+  --checkpoint .tmp/resume-example.json
+```
+
+These examples correspond to Levels 2–3 and the recovery-evidence bonus in the
+[Resilience Challenge](https://github.com/bockuden/resilient-automation-test-stand/blob/main/CHALLENGE.md).
 
 For a production-style .NET consumer with retries, checkpoints, cancellation,
 and browser evidence, see
@@ -373,7 +378,7 @@ also accepts `page` from 1 through 20.
 
 | Parameter | Built-in default | Meaning |
 | --- | --- | --- |
-| `scenario` | `success` | Selects the deterministic behavior described below |
+| `scenario` | `success` | Selects a case from [the proof matrix](https://github.com/bockuden/resilient-automation-test-stand#what-each-case-proves) |
 | `run_id` | `manual` | Isolates request-attempt counters between test cases |
 | `total_pages` | `4` | Number of catalog pages to expose (1-20) |
 | `fail_for` | `2` | Initial `503` responses per page in `transient` (0-10) |
@@ -381,18 +386,6 @@ also accepts `page` from 1 through 20.
 | `delay_ms` | `1500` | Delay per API request in `slow` (0-30000 ms) |
 | `fail_page` | `3` | Permanently failing page in `resume` (1-20) |
 | `protected` | `false` | Require the demo login before serving `/catalog` |
-
-## Scenarios
-
-| Scenario | Behavior |
-| --- | --- |
-| `success` | Returns `total_pages` pages of five unique items each |
-| `transient` | Returns `503` with `Retry-After: 1` for the first `fail_for` attempts of each page, then recovers |
-| `permanent` | Always returns `500` from the catalog API |
-| `slow` | Delays every catalog API response by `delay_ms`, enabling timeout and cancellation tests |
-| `resume` | Loads other pages but returns `500` on `fail_page`, enabling durable checkpoint and resume tests |
-| `dom-change` | Changes catalog element names and CSS classes while preserving stable `data-testid` locators |
-| `duplicates` | Repeats the previous page's final item as the next page's first item |
 
 The same `run_id`, scenario, and page share an attempt counter. Call
 `POST /admin/reset` or choose a fresh `run_id` when a test needs clean state.

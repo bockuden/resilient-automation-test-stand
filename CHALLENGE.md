@@ -91,7 +91,9 @@ failure and leave enough evidence for another engineer to reproduce it.
 
 ## Reference material
 
-- [Python Playwright retry recipe](README.md#python-playwright-retry-a-transient-browser-scenario)
+- [Python Playwright login and retry example](resilient_automation_test_stand/examples/playwright_resilience.py)
+- [HTTP retry, pagination, and deduplication example](resilient_automation_test_stand/examples/api_retry_dedup.py)
+- [Checkpoint and resume example](resilient_automation_test_stand/examples/resume_checkpoint.py)
 - [C# resilient browser automation consumer](https://github.com/bockuden/resilient-browser-automation)
 - [Public compatibility policy](docs/compatibility.md)
 

@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.1.5 - 2026-07-28
+
+### Added
+
+- Added runnable examples for Playwright login and bounded transient recovery,
+  HTTP `Retry-After` handling with pagination and deduplication, and durable
+  checkpoint/resume.
+- Shipped the examples in both wheel and source distributions so they run
+  after a normal package installation, not only from a repository checkout.
+- Added regression coverage for successful recovery, exhausted retry budgets,
+  checkpoint continuation, and README example discovery.
+
+### Changed
+
+- Replaced the long inline Playwright snippet with tested module commands and
+  linked them from the Resilience Challenge.
+- Removed the shorter duplicate scenario table while retaining the canonical
+  behavior-to-proof matrix and the separate HTTP parameter reference.
+
+### Compatibility
+
+This release adds optional consumer examples only. The Test Stand server,
+HTTP and CLI contracts, scenario semantics, browser locators, runtime
+dependencies, and container runtime behavior are unchanged. Playwright and
+Chromium are required only to run the optional Playwright example; installing
+or running the Test Stand does not install or require them.
+
 ## 1.1.4 - 2026-07-28
 
 ### Changed

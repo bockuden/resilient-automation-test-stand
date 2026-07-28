@@ -15,7 +15,7 @@ from resilient_automation_test_stand.presets import Scenario, ScenarioDefaults
 
 app = FastAPI(
     title="Resilient Browser Automation Test Stand",
-    version="1.1.4",
+    version="1.1.5",
     docs_url="/api-docs",
 )
 app.mount(
