@@ -64,6 +64,48 @@ jobs:
           /tmp/stand-sdist-test/bin/python -m pip install dist/*.tar.gz
           /tmp/stand-sdist-test/bin/automation-test-stand --help >/dev/null
 
+      - name: Smoke test installed wheel runtime
+        if: matrix.python-version == '3.13'
+        shell: bash
+        run: |
+          /tmp/stand-wheel-test/bin/automation-test-stand --port 18080 >/tmp/stand-wheel.log 2>&1 &
+          stand_pid=$!
+          trap 'kill "$stand_pid" 2>/dev/null || true' EXIT
+
+          for attempt in {1..30}; do
+            if curl --fail --silent http://localhost:18080/health >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              cat /tmp/stand-wheel.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          test "$(curl --silent http://localhost:18080/health)" = '{"status":"ok"}'
+          curl --fail --silent \
+            'http://localhost:18080/catalog?scenario=transient&run_id=ci-wheel&fail_for=2' \
+            >/dev/null
+
+          for expected_status in 503 503 200; do
+            actual_status="$(
+              curl --silent \
+                --dump-header /tmp/stand-wheel.headers \
+                --output /tmp/stand-wheel.body \
+                --write-out '%{http_code}' \
+                'http://localhost:18080/api/catalog?scenario=transient&run_id=ci-wheel&fail_for=2&page=1'
+            )"
+            test "$actual_status" = "$expected_status"
+            if [ "$expected_status" = 503 ]; then
+              tr -d '\r' </tmp/stand-wheel.headers | grep --ignore-case --quiet '^retry-after: 1$'
+            fi
+          done
+
+          kill "$stand_pid"
+          wait "$stand_pid" || true
+          trap - EXIT
+
       - name: Validate a clean clone
         if: matrix.python-version == '3.13'
         shell: bash
@@ -108,7 +150,25 @@ jobs:
             fi
             sleep 1
           done
-          curl --fail --silent http://localhost:8080/catalog >/dev/null
+          test "$(curl --silent http://localhost:8080/health)" = '{"status":"ok"}'
+          curl --fail --silent \
+            'http://localhost:8080/catalog?scenario=transient&run_id=ci-docker&fail_for=2' \
+            >/dev/null
+
+          for expected_status in 503 503 200; do
+            actual_status="$(
+              curl --silent \
+                --dump-header /tmp/stand-docker.headers \
+                --output /tmp/stand-docker.body \
+                --write-out '%{http_code}' \
+                'http://localhost:8080/api/catalog?scenario=transient&run_id=ci-docker&fail_for=2&page=1'
+            )"
+            test "$actual_status" = "$expected_status"
+            if [ "$expected_status" = 503 ]; then
+              tr -d '\r' </tmp/stand-docker.headers | grep --ignore-case --quiet '^retry-after: 1$'
+            fi
+          done
+
           docker exec automation-test-stand-ci python -c "import importlib.util, pathlib; assert importlib.util.find_spec('pytest') is None; assert not pathlib.Path('/app/tests').exists()"
 
       - name: Stop runtime image

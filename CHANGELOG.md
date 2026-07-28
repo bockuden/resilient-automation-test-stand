@@ -7,6 +7,9 @@
 - Restyled the demo login page to use the catalog's visual system, with a
   responsive dark workspace, accessible labelled fields, focus states, and
   visible fixed demo credentials.
+- Extended release verification so clean wheel and Docker runtimes must prove
+  health, browser-catalog availability, and the documented transient
+  `503`, `503`, `200` sequence with `Retry-After`.
 
 ### Compatibility
 
