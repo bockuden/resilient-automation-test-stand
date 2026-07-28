@@ -33,7 +33,7 @@ automation-test-stand --port 8080
 
 ```bash
 docker run --rm -p 8080:8080 \
-  ghcr.io/bockuden/resilient-automation-test-stand:1.1.2
+  ghcr.io/bockuden/resilient-automation-test-stand:1.1.3
 ```
 
 After starting either distribution, open this URL in a browser or navigate to
@@ -59,26 +59,38 @@ succeeds. Use a new `run_id` for a clean, independent failure sequence.
   third-party website.
 - Educators teaching resilient automation without depending on a live site.
 
-## Why not WireMock or Toxiproxy?
+## What each case proves
 
 An ordinary mock often returns one static response. This stand keeps a small,
 isolated state machine per `run_id`, so a consumer has to prove its behavior
 across an ordered sequence of requests.
 
-[WireMock](https://wiremock.org/docs/stateful-behaviour/) is the better fit
-when you need arbitrary mappings and custom state machines.
-[Toxiproxy](https://github.com/Shopify/toxiproxy) is the better fit for
-transport-level latency, connection cuts, and bandwidth faults. Choose this
-stand when you want a ready-made browser and API workflow with login,
-pagination, stable locators, and deterministic recovery cases.
+| Case | Deterministic behavior | What the consumer must prove |
+| --- | --- | --- |
+| `success` | Every in-range page returns five stable items and `200`. | It can complete the baseline paginated workflow. |
+| `transient` | The first `fail_for` requests per page return `503` with `Retry-After: 1`, then `200`. | It honors the delay, caps its retry budget, and eventually succeeds. |
+| `permanent` | Every catalog API request returns `500`. | It stops retrying and reports a terminal failure instead of looping forever. |
+| `slow` | Each API response waits for `delay_ms`, then returns the normal page. | Its timeout and cancellation policies end the operation cleanly. |
+| `resume` | Only `fail_page` returns `500`; the other pages remain available. | It persists a checkpoint and resumes without reprocessing completed pages. |
+| `duplicates` | Each page after the first begins with the previous page's final item ID. | It deduplicates records across pagination boundaries. |
+| `dom-change` | CSS classes and element nesting change while stable `data-testid` locators remain. | It uses semantic or stable locators rather than DOM shape. |
+| `protected=true` | The browser route redirects through the fixed demo login and back to the original catalog URL. | It preserves the session cookie and return URL. |
 
-| Failure mode | What a consumer can prove |
+## Where WireMock and Toxiproxy fit
+
+This stand complements general-purpose mocking and network-fault tools. Start
+with the tool whose primary surface matches the behavior you need to test.
+
+| Primary need | Start with |
 | --- | --- |
-| `transient` | It honors `Retry-After`, limits retries, and eventually succeeds. |
-| `resume` | It saves progress and resumes after a permanent page failure. |
-| `dom-change` | It relies on stable `data-testid` locators rather than CSS shape. |
-| `duplicates` | It deduplicates items across pagination boundaries. |
-| `protected` | It preserves the demo login session and return URL. |
+| Arbitrary HTTP mappings and configurable state-machine transitions | [WireMock](https://wiremock.org/docs/stateful-behaviour/) |
+| TCP latency, bandwidth limits, timeouts, connection shutdowns, and resets | [Toxiproxy](https://github.com/Shopify/toxiproxy) |
+| A ready-made browser workflow with login, UI, API, pagination, and recovery cases | Resilient Automation Test Stand |
+
+WireMock lets a team define its own mappings and scenario states. Toxiproxy
+manipulates connections between a client and an upstream service. This stand
+trades that generality for a shorter path from startup to a reproducible
+browser-automation resilience test.
 
 ## Development setup
 

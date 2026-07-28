@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.1.3 - 2026-07-28
+
+### Changed
+
+- Expanded the README scenario table into a complete behavior-to-proof matrix
+  covering the success baseline, transient and permanent failures, delays,
+  checkpoint/resume, duplicates, DOM changes, and protected login.
+- Added a focused comparison table that positions WireMock for configurable
+  HTTP state machines, Toxiproxy for TCP-level faults, and this stand for
+  ready-made browser and API resilience workflows.
+
+### Compatibility
+
+This is a documentation-only release. HTTP behavior, CLI options, scenario
+semantics, browser locators, and package requirements are unchanged.
+
 ## 1.1.2 - 2026-07-28
 
 ### Changed
