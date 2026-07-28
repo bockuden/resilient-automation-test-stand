@@ -2,3 +2,4 @@ include CHANGELOG.md
 recursive-include docs *.gif *.json *.md
 recursive-include examples *.toml
 recursive-include resilient_automation_test_stand/static *.css *.js
+recursive-include scripts *.py

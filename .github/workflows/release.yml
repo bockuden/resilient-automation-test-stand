@@ -34,6 +34,13 @@ jobs:
           package_version="$(python -c "from importlib.metadata import version; print(version('resilient-automation-test-stand'))")"
           test "v${package_version}" = "${GITHUB_REF_NAME}"
 
+      - name: Build structured release notes
+        shell: bash
+        run: |
+          python scripts/build_release_notes.py \
+            --version "${GITHUB_REF_NAME#v}" \
+            --output release-notes.md
+
       - name: Test package and contract
         run: |
           python -m pytest
@@ -46,6 +53,13 @@ jobs:
         with:
           name: python-distributions
           path: dist/
+          if-no-files-found: error
+
+      - name: Upload verified release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-release-notes
+          path: release-notes.md
           if-no-files-found: error
 
   publish-pypi:
@@ -124,12 +138,18 @@ jobs:
           name: python-distributions
           path: dist/
 
+      - name: Download verified release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: github-release-notes
+          path: .
+
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          release_flags=(--generate-notes --verify-tag)
+          release_flags=(--notes-file release-notes.md --title "$GITHUB_REF_NAME" --verify-tag)
           if [[ "$GITHUB_REF_NAME" == *rc* ]]; then
             release_flags+=(--prerelease)
           fi

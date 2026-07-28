@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.1.4 - 2026-07-28
+
+### Changed
+
+- Clarified that the C# reference consumer is a production-style worker
+  validated against a pinned Test Stand release.
+- Replaced relative README links and media destinations with absolute GitHub
+  URLs so the same long description works from GitHub and PyPI.
+- Aligned the package summary with the failure-sandbox positioning and added
+  direct PyPI project links to the Resilience Challenge, container images, and
+  C# reference consumer.
+
+### Release engineering
+
+- Added tested, version-specific GitHub Release notes with install, run, sample
+  URL, contract, and upgrade sections generated from the matching changelog
+  entry.
+- Release-note generation now runs in the pre-publication build job; the
+  verified notes are passed to the final GitHub Release as a dedicated
+  artifact.
+- Added regression coverage for release-note generation and PyPI-safe README
+  links, including verification from the source distribution.
+
+### Compatibility
+
+This release changes documentation, package presentation, and release tooling
+only. HTTP behavior, CLI options, scenario semantics, browser locators, and
+package requirements are unchanged.
+
 ## 1.1.3 - 2026-07-28
 
 ### Changed

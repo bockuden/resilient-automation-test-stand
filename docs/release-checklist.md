@@ -23,7 +23,12 @@ PyPI API token. See the official
 - `pyproject.toml`, package metadata, and changelog contain the target version.
 - `python -m pytest` passes on supported Python versions in CI.
 - `python scripts/export_openapi.py --check` passes.
+- `python scripts/build_release_notes.py --version <version>` renders the
+  current changelog entry with Install, Run, Try this URL,
+  Contract and compatibility, and Upgrade notes sections.
 - `python -m build` and `twine check dist/*` pass.
+- Every Markdown link and image in the package README uses an absolute HTTPS
+  URL, so the same long description works from both GitHub and PyPI.
 - Clean virtual environments install and run both the wheel and sdist.
 - A clean wheel installation starts through `automation-test-stand`, returns
   `{"status":"ok"}` from `/health`, serves the browser catalog, and produces
@@ -44,7 +49,9 @@ Pushing a verified tag runs these jobs in order:
 1. verify and build the Python distributions once;
 2. publish those verified distributions to PyPI using OIDC;
 3. publish the container to GHCR after the build succeeds;
-4. create a GitHub Release with the verified wheel and sdist.
+4. create a GitHub Release with the verified wheel and sdist plus structured,
+   version-specific install, run, example URL, compatibility, and upgrade
+   notes generated from the matching changelog entry.
 
 The Docker metadata action derives version tags from PEP 440 release tags. The
 default `latest` tag is emitted only for a final release, not for a pre-release.
@@ -96,6 +103,9 @@ repository.
 
 The PyPI release, GitHub Release, wheel, sdist, image tag, and OCI
 `org.opencontainers.image.version` label must all name the same version.
+Confirm that the PyPI project description renders its GIF and that its links to
+the challenge, source documents, license, container, and reference consumer
+resolve to the intended GitHub locations.
 
 ## Source distribution contents
 

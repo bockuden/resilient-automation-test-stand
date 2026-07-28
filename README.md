@@ -2,8 +2,8 @@
 
 [![Build and test](https://github.com/bockuden/resilient-automation-test-stand/actions/workflows/tests.yml/badge.svg)](https://github.com/bockuden/resilient-automation-test-stand/actions/workflows/tests.yml)
 [![PyPI](https://img.shields.io/pypi/v/resilient-automation-test-stand.svg)](https://pypi.org/project/resilient-automation-test-stand/)
-[![Python 3.11–3.13](https://img.shields.io/badge/python-3.11%E2%80%933.13-blue)](pyproject.toml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Python 3.11–3.13](https://img.shields.io/badge/python-3.11%E2%80%933.13-blue)](https://github.com/bockuden/resilient-automation-test-stand/blob/main/pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/bockuden/resilient-automation-test-stand/blob/main/LICENSE)
 
 A ready-to-run deterministic failure sandbox for browser automation.
 
@@ -33,7 +33,7 @@ automation-test-stand --port 8080
 
 ```bash
 docker run --rm -p 8080:8080 \
-  ghcr.io/bockuden/resilient-automation-test-stand:1.1.3
+  ghcr.io/bockuden/resilient-automation-test-stand:1.1.4
 ```
 
 After starting either distribution, open this URL in a browser or navigate to
@@ -47,7 +47,7 @@ The consumer—not the stand—owns the retry policy. The first two catalog API
 requests for this `run_id` return `503` with `Retry-After: 1`; the third
 succeeds. Use a new `run_id` for a clean, independent failure sequence.
 
-![A real transient scenario: two 503 responses with Retry-After, then a successful catalog load](docs/assets/transient-retry.gif)
+![A real transient scenario: two 503 responses with Retry-After, then a successful catalog load](https://raw.githubusercontent.com/bockuden/resilient-automation-test-stand/main/docs/assets/transient-retry.gif)
 
 ## Who this is for
 
@@ -295,14 +295,14 @@ and browser evidence, see
 ## Resilience Challenge
 
 Work through the four-level, reproducible
-[Resilience Challenge](CHALLENGE.md) to validate a consumer against success,
+[Resilience Challenge](https://github.com/bockuden/resilient-automation-test-stand/blob/main/CHALLENGE.md) to validate a consumer against success,
 transient recovery, login, DOM changes, duplicates, resume, and cancellation.
 
 ## Named scenario presets
 
 For repeated scenarios, the same values can be stored in a TOML file instead
 of copied into every startup command. The repository includes
-[`examples/scenarios.toml`](examples/scenarios.toml) with the three cookbook
+[`examples/scenarios.toml`](https://github.com/bockuden/resilient-automation-test-stand/blob/main/examples/scenarios.toml) with the three cookbook
 scenarios above.
 
 These CLI commands are identical in PowerShell, Linux, and macOS shells:
@@ -408,21 +408,21 @@ python scripts/export_openapi.py --check
 python -m build
 ```
 
-The committed contract is [docs/api/openapi.json](docs/api/openapi.json). If an
+The committed contract is [docs/api/openapi.json](https://github.com/bockuden/resilient-automation-test-stand/blob/main/docs/api/openapi.json). If an
 endpoint or model changes, regenerate it with:
 
 ```bash
 python scripts/export_openapi.py
 ```
 
-Contract changes require an updated snapshot, [release notes](CHANGELOG.md), a
+Contract changes require an updated snapshot, [release notes](https://github.com/bockuden/resilient-automation-test-stand/blob/main/CHANGELOG.md), a
 package version change, and a backward-compatibility review. The release
-roadmap is tracked in [the development plan](docs/development-plan.md). The
+roadmap is tracked in [the development plan](https://github.com/bockuden/resilient-automation-test-stand/blob/main/docs/development-plan.md). The
 intended 1.0 public contract and compatibility policy are documented in
-[docs/compatibility.md](docs/compatibility.md). Release prerequisites and the
+[docs/compatibility.md](https://github.com/bockuden/resilient-automation-test-stand/blob/main/docs/compatibility.md). Release prerequisites and the
 one-time PyPI Trusted Publisher setup are documented in
-[docs/release-checklist.md](docs/release-checklist.md).
+[docs/release-checklist.md](https://github.com/bockuden/resilient-automation-test-stand/blob/main/docs/release-checklist.md).
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/bockuden/resilient-automation-test-stand/blob/main/LICENSE).

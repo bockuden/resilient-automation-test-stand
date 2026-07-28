@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "resilient-automation-test-stand"
-version = "1.1.3"
-description = "A deterministic FastAPI target for browser automation integration tests"
+version = "1.1.4"
+description = "A ready-to-run deterministic failure sandbox for browser automation"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
@@ -58,6 +58,9 @@ Issues = "https://github.com/bockuden/resilient-automation-test-stand/issues"
 Documentation = "https://github.com/bockuden/resilient-automation-test-stand#readme"
 Changelog = "https://github.com/bockuden/resilient-automation-test-stand/blob/main/CHANGELOG.md"
 "API contract" = "https://github.com/bockuden/resilient-automation-test-stand/blob/main/docs/compatibility.md"
+"Resilience Challenge" = "https://github.com/bockuden/resilient-automation-test-stand/blob/main/CHALLENGE.md"
+"Container images" = "https://github.com/bockuden/resilient-automation-test-stand/pkgs/container/resilient-automation-test-stand"
+"C# reference consumer" = "https://github.com/bockuden/resilient-browser-automation"
 
 [tool.setuptools.packages.find]
 include = ["resilient_automation_test_stand*"]
