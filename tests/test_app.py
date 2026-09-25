@@ -212,9 +212,7 @@ async def test_custom_credentials_work_and_default_credentials_fail(client: Asyn
 
 @pytest.mark.anyio
 async def test_login_form_does_not_render_configured_credentials(client: AsyncClient) -> None:
-    configure_auth(
-        ResolvedAuth(username="env-secret-user", password="env-secret-password")
-    )
+    configure_auth(ResolvedAuth(username="env-secret-user", password="env-secret-password"))
 
     response = await client.get("/login")
 
