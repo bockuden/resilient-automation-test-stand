@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Added global TOML authentication credentials with environment-variable
+  overrides while preserving the built-in `demo` / `automation` defaults.
+- Replaced visible demo credentials on the login page with a neutral hint.
+
+### Compatibility
+
+Existing preset files and protected login flows continue to work unchanged.
+Authentication remains enabled per scenario with `protected=true`; credentials
+are resolved once from the global config and environment.
+
 ## 1.1.5 - 2026-07-28
 
 ### Added

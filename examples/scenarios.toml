@@ -1,3 +1,7 @@
+[auth]
+username = "demo"
+password_env = "TEST_PASSWORD"
+
 [presets.ten-pages]
 scenario = "success"
 total_pages = 10
