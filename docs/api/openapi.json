@@ -376,7 +376,7 @@
     },
     "/catalog": {
       "get": {
-        "description": "Renders a JavaScript catalog UI. Protected scenarios redirect to the demo login form. Use stable data-testid locators when automating this page.",
+        "description": "Renders a JavaScript catalog UI. Protected scenarios redirect to the configured login form. Use stable data-testid locators when automating this page.",
         "operationId": "get_catalog_shell",
         "parameters": [
           {
@@ -519,7 +519,7 @@
             }
           },
           {
-            "description": "Require the fixed demo login before serving the catalog shell.",
+            "description": "Require login with configured credentials before serving the catalog shell.",
             "in": "query",
             "name": "protected",
             "required": false,
@@ -532,7 +532,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Require the fixed demo login before serving the catalog shell.",
+              "description": "Require login with configured credentials before serving the catalog shell.",
               "title": "Protected"
             }
           },
@@ -565,7 +565,7 @@
             "description": "Successful Response"
           },
           "303": {
-            "description": "Protected catalog redirects to the demo login form."
+            "description": "Protected catalog redirects to the configured login form."
           },
           "422": {
             "content": {
@@ -606,7 +606,7 @@
     },
     "/login": {
       "get": {
-        "description": "Renders the fixed-credential form used only by protected catalog scenarios.",
+        "description": "Renders the configured-credential form used by protected catalog scenarios.",
         "operationId": "get_demo_login_form",
         "parameters": [
           {
@@ -645,7 +645,7 @@
         "summary": "Render the demo login form"
       },
       "post": {
-        "description": "Accepts the fixed demo credentials and redirects to a local catalog URL.",
+        "description": "Accepts the configured credentials and redirects to a local catalog URL.",
         "operationId": "submit_demo_login",
         "requestBody": {
           "content": {
@@ -667,7 +667,7 @@
             "description": "Successful Response"
           },
           "401": {
-            "description": "The supplied demo credentials are invalid."
+            "description": "The supplied credentials are invalid."
           },
           "422": {
             "content": {

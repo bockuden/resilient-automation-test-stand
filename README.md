@@ -74,7 +74,7 @@ across an ordered sequence of requests.
 | `resume` | Only `fail_page` returns `500`; the other pages remain available. | It persists a checkpoint and resumes without reprocessing completed pages. |
 | `duplicates` | Each page after the first begins with the previous page's final item ID. | It deduplicates records across pagination boundaries. |
 | `dom-change` | CSS classes and element nesting change while stable `data-testid` locators remain. | It uses semantic or stable locators rather than DOM shape. |
-| `protected=true` | The browser route redirects through the fixed demo login and back to the original catalog URL. | It preserves the session cookie and return URL. |
+| `protected=true` | The browser route redirects through the configured login and back to the original catalog URL. | It preserves the session cookie and return URL. |
 
 ## Where WireMock and Toxiproxy fit
 
@@ -167,17 +167,32 @@ Released images are published as
 
 Add `protected=true` to a `/catalog` URL, or select a preset with
 `protected = true`, to redirect the browser to the login form. The credentials
-are fixed test-stand values:
+default to these test-stand values:
 
 | Value | Input |
 | --- | --- |
 | Username | `demo` |
 | Password | `automation` |
 
-They are intentionally not configured in `scenarios.toml`. That file selects
-whether login is required; a user enters the values above in the form, while an
-automation script fills `input[name="username"]` and
-`input[name="password"]`, then submits the form.
+They can be overridden globally in the TOML configuration. For example, keep
+the default username and read a password from the environment:
+
+```toml
+[auth]
+username = "demo"
+password_env = "TEST_PASSWORD"
+```
+
+When the named environment variable is set, its value overrides the literal
+TOML value. If it is absent, the literal value is used, then the built-in
+default. Do not store real secrets in the repository; set them in the process
+environment or your secret manager. The `[auth]` section only supplies
+credentials: `protected=true` remains the switch that requires login.
+
+A user enters the configured values in the form, while an automation script
+fills `input[name="username"]` and `input[name="password"]`, then submits the
+form. Credentials are server-level configuration and are never part of the
+scenario URL.
 
 The equivalent form request is:
 
@@ -256,7 +271,7 @@ playwright install chromium
 python -m resilient_automation_test_stand.examples.playwright_resilience
 ```
 
-The script logs in with the fixed demo account, reads `Retry-After`, performs at
+The script logs in with the configured account, reads `Retry-After`, performs at
 most three browser attempts, and asserts five items on recovery.
 
 ### HTTP API: retry, pagination, and deduplication
@@ -318,10 +333,13 @@ automation-test-stand --config examples/scenarios.toml --print-url login-delayed
 automation-test-stand --config examples/scenarios.toml --preset login-delayed-retry --port 8080
 ```
 
-`--print-url` emits a self-contained URL that no longer depends on the config
-file. `--preset` starts the server with that preset as its defaults. An explicit
-query parameter overrides only the matching preset field, so the following URL
-uses the preset's ten pages but disables its transient failures:
+`--print-url` emits a URL that is self-contained with respect to scenario
+parameters. Server-level authentication still comes from the TOML config and
+environment. `--config` applies global auth settings even without `--preset`;
+`--preset` additionally starts the server with that preset as its scenario
+defaults. An explicit query parameter overrides only the matching preset
+field, so the following URL uses the preset's ten pages but disables its
+transient failures:
 
 ```text
 http://localhost:8080/catalog?scenario=success&run_id=override-example

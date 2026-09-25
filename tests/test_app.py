@@ -1,11 +1,16 @@
+from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 import resilient_automation_test_stand.main as app_module
-from resilient_automation_test_stand.main import app, configure_scenario_defaults
-from resilient_automation_test_stand.presets import ScenarioDefaults
+from resilient_automation_test_stand.main import app, configure_auth, configure_scenario_defaults
+from resilient_automation_test_stand.presets import (
+    ResolvedAuth,
+    ScenarioDefaults,
+    load_preset_document,
+)
 
 
 @pytest.fixture
@@ -16,6 +21,7 @@ def anyio_backend() -> str:
 @pytest.fixture
 async def client() -> AsyncClient:
     configure_scenario_defaults(ScenarioDefaults())
+    configure_auth(ResolvedAuth())
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as test_client:
         await test_client.post("/admin/reset")
@@ -23,6 +29,7 @@ async def client() -> AsyncClient:
             yield test_client
         finally:
             configure_scenario_defaults(ScenarioDefaults())
+            configure_auth(ResolvedAuth())
 
 
 @pytest.mark.anyio
@@ -126,7 +133,7 @@ def test_openapi_preserves_catalog_query_parameter_contract() -> None:
         "title": "Page",
     }
     assert catalog_parameters["protected"]["schema"]["description"] == (
-        "Require the fixed demo login before serving the catalog shell."
+        "Require login with configured credentials before serving the catalog shell."
     )
 
 
@@ -165,6 +172,80 @@ async def test_login_sets_session_cookie(client: AsyncClient) -> None:
     )
     assert response.status_code == 303
     assert response.cookies["demo_session"] == "authenticated"
+
+
+@pytest.mark.anyio
+async def test_wrong_default_credentials_return_unauthorized(client: AsyncClient) -> None:
+    response = await client.post(
+        "/login",
+        data={"username": "demo", "password": "wrong", "next_url": "/catalog"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.anyio
+async def test_custom_credentials_work_and_default_credentials_fail(client: AsyncClient) -> None:
+    configure_auth(ResolvedAuth(username="custom-user", password="custom-password"))
+
+    old_credentials = await client.post(
+        "/login",
+        data={"username": "demo", "password": "automation", "next_url": "/catalog"},
+        follow_redirects=False,
+    )
+    custom_credentials = await client.post(
+        "/login",
+        data={
+            "username": "custom-user",
+            "password": "custom-password",
+            "next_url": "/catalog?protected=true",
+        },
+        follow_redirects=False,
+    )
+
+    assert old_credentials.status_code == 401
+    assert custom_credentials.status_code == 303
+    assert custom_credentials.headers["location"] == "/catalog?protected=true"
+    assert custom_credentials.cookies["demo_session"] == "authenticated"
+
+
+@pytest.mark.anyio
+async def test_login_form_does_not_render_configured_credentials(client: AsyncClient) -> None:
+    configure_auth(ResolvedAuth(username="env-secret-user", password="env-secret-password"))
+
+    response = await client.get("/login")
+
+    assert response.status_code == 200
+    assert "Use the credentials configured for this test stand." in response.text
+    assert "env-secret-user" not in response.text
+    assert "env-secret-password" not in response.text
+
+
+@pytest.mark.anyio
+async def test_login_form_does_not_render_environment_secret(
+    client: AsyncClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LOGIN_FORM_SECRET", "environment-secret-value")
+    config_path = tmp_path / "scenarios.toml"
+    config_path.write_text(
+        """
+[auth]
+password_env = "LOGIN_FORM_SECRET"
+
+[presets.protected]
+protected = true
+""",
+        encoding="utf-8",
+    )
+    configure_auth(load_preset_document(config_path).resolved_auth)
+
+    response = await client.get("/login")
+
+    assert response.status_code == 200
+    assert "environment-secret-value" not in response.text
 
 
 @pytest.mark.anyio

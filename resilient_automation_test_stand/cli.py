@@ -4,10 +4,11 @@ from typing import Sequence
 
 import uvicorn
 
-from resilient_automation_test_stand.main import app, configure_scenario_defaults
+from resilient_automation_test_stand.main import app, configure_auth, configure_scenario_defaults
 from resilient_automation_test_stand.presets import (
     PresetConfigError,
     PresetDocument,
+    ResolvedAuth,
     ScenarioDefaults,
     load_preset_document,
     preset_url,
@@ -43,7 +44,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--log-level", default="info")
-    parser.add_argument("--config", type=Path, help="TOML file containing presets")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        help="TOML file containing global authentication settings and presets",
+    )
     actions = parser.add_mutually_exclusive_group()
     actions.add_argument("--preset", help="Use a preset as the server defaults")
     actions.add_argument(
@@ -83,6 +88,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         document = document or _load_document(parser, args.config)
         defaults = _select_preset(parser, document, args.preset)
     configure_scenario_defaults(defaults)
+    configure_auth(document.resolved_auth if document else ResolvedAuth())
 
     uvicorn.run(
         app,
