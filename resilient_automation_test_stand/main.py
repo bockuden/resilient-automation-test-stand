@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from resilient_automation_test_stand.presets import Scenario, ScenarioDefaults
+from resilient_automation_test_stand.presets import ResolvedAuth, Scenario, ScenarioDefaults
 
 app = FastAPI(
     title="Resilient Browser Automation Test Stand",
@@ -24,12 +24,17 @@ app.mount(
     name="static",
 )
 app.state.scenario_defaults = ScenarioDefaults()
+app.state.auth = ResolvedAuth()
 
 request_attempts: dict[tuple[str, str, int], int] = defaultdict(int)
 
 
 def configure_scenario_defaults(defaults: ScenarioDefaults) -> None:
     app.state.scenario_defaults = defaults
+
+
+def configure_auth(auth: ResolvedAuth) -> None:
+    app.state.auth = auth
 
 
 def _resolved_defaults(query: "CatalogQuery") -> ScenarioDefaults:
@@ -97,7 +102,7 @@ class CatalogQuery(BaseModel):
 class CatalogShellQuery(CatalogQuery):
     protected: bool | None = Field(
         default=None,
-        description="Require the fixed demo login before serving the catalog shell.",
+        description="Require login with configured credentials before serving the catalog shell.",
     )
 
 
@@ -137,7 +142,7 @@ async def reset() -> dict[str, int]:
     response_class=HTMLResponse,
     operation_id="get_demo_login_form",
     summary="Render the demo login form",
-    description="Renders the fixed-credential form used only by protected catalog scenarios.",
+    description="Renders the configured-credential form used by protected catalog scenarios.",
 )
 async def login_form(next_url: str = "/catalog") -> str:
     safe_next = escape(next_url, quote=True)
@@ -160,7 +165,7 @@ async def login_form(next_url: str = "/catalog") -> str:
       <section class="workspace login-workspace" aria-labelledby="login-title">
         <div class="login-intro">
           <h2 id="login-title">Continue your test run</h2>
-          <p>Use the fixed demo credentials to preserve the catalog return URL.</p>
+          <p>Use the credentials configured for this test stand.</p>
         </div>
         <form class="login-form" method="post" action="/login">
           <input type="hidden" name="next_url" value="{safe_next}">
@@ -170,7 +175,6 @@ async def login_form(next_url: str = "/catalog") -> str:
           <input id="password" name="password" type="password" autocomplete="current-password" required>
           <button type="submit">Sign in</button>
         </form>
-        <p class="login-hint">Demo credentials: <code>demo</code> / <code>automation</code></p>
       </section>
     </main>
   </body>
@@ -183,15 +187,16 @@ async def login_form(next_url: str = "/catalog") -> str:
     status_code=303,
     operation_id="submit_demo_login",
     summary="Authenticate to a protected demo catalog",
-    description="Accepts the fixed demo credentials and redirects to a local catalog URL.",
-    responses={401: {"description": "The supplied demo credentials are invalid."}},
+    description="Accepts the configured credentials and redirects to a local catalog URL.",
+    responses={401: {"description": "The supplied credentials are invalid."}},
 )
 async def login(
     username: Annotated[str, Form()],
     password: Annotated[str, Form()],
     next_url: Annotated[str, Form()] = "/catalog",
 ) -> RedirectResponse:
-    if username != "demo" or password != "automation":
+    auth: ResolvedAuth = app.state.auth
+    if username != auth.username or password != auth.password:
         raise HTTPException(status_code=401, detail="Invalid demo credentials")
 
     safe_next = (
@@ -208,10 +213,10 @@ async def login(
     operation_id="get_catalog_shell",
     summary="Render the browser catalog shell",
     description=(
-        "Renders a JavaScript catalog UI. Protected scenarios redirect to the demo login form. "
+        "Renders a JavaScript catalog UI. Protected scenarios redirect to the configured login form. "
         "Use stable data-testid locators when automating this page."
     ),
-    responses={303: {"description": "Protected catalog redirects to the demo login form."}},
+    responses={303: {"description": "Protected catalog redirects to the configured login form."}},
 )
 async def catalog(
     query: Annotated[CatalogShellQuery, Query()],
