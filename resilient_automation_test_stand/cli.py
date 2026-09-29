@@ -4,12 +4,18 @@ from typing import Sequence
 
 import uvicorn
 
-from resilient_automation_test_stand.main import app, configure_auth, configure_scenario_defaults
+from resilient_automation_test_stand.main import (
+    app,
+    configure_auth,
+    configure_scenario_defaults,
+    configure_selectors,
+)
 from resilient_automation_test_stand.presets import (
     PresetConfigError,
     PresetDocument,
     ResolvedAuth,
     ScenarioDefaults,
+    SelectorConfig,
     load_preset_document,
     preset_url,
 )
@@ -47,7 +53,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "--config",
         type=Path,
-        help="TOML file containing global authentication settings and presets",
+        help="TOML file containing global authentication, selectors, and presets",
     )
     actions = parser.add_mutually_exclusive_group()
     actions.add_argument("--preset", help="Use a preset as the server defaults")
@@ -89,6 +95,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         defaults = _select_preset(parser, document, args.preset)
     configure_scenario_defaults(defaults)
     configure_auth(document.resolved_auth if document else ResolvedAuth())
+    configure_selectors(document.selectors if document else SelectorConfig())
 
     uvicorn.run(
         app,

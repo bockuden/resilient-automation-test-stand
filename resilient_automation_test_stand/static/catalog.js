@@ -3,6 +3,7 @@ const config = JSON.parse(configNode.textContent);
 const catalog = document.querySelector('#catalog');
 const status = document.querySelector('#status');
 const nav = document.querySelector('nav');
+catalog.dataset.testid = config.selectors.catalog;
 
 async function loadPage(page) {
   status.textContent = `Loading page ${page}...`;
@@ -32,12 +33,20 @@ async function loadPage(page) {
     for (const item of data.items) {
       const outer = document.createElement(config.scenario === 'dom-change' ? 'article' : 'div');
       outer.className = config.scenario === 'dom-change' ? 'result-tile-v2' : 'product-card';
-      outer.dataset.testid = 'catalog-item';
+      outer.dataset.testid = config.selectors.item;
       outer.dataset.itemId = item.id;
-      outer.innerHTML =
-        config.scenario === 'dom-change'
-          ? `<div class="content"><span data-testid="item-name">${item.name}</span><strong data-testid="item-price">${item.price.toFixed(2)}</strong></div>`
-          : `<h2 data-testid="item-name">${item.name}</h2><span data-testid="item-price">${item.price.toFixed(2)}</span>`;
+      const content = config.scenario === 'dom-change' ? document.createElement('div') : outer;
+      if (config.scenario === 'dom-change') content.className = 'content';
+      const name = document.createElement(config.scenario === 'dom-change' ? 'span' : 'h2');
+      name.className = 'item-name';
+      name.dataset.testid = config.selectors.item_name;
+      name.textContent = item.name;
+      const price = document.createElement(config.scenario === 'dom-change' ? 'strong' : 'span');
+      price.className = 'item-price';
+      price.dataset.testid = config.selectors.item_price;
+      price.textContent = item.price.toFixed(2);
+      content.append(name, price);
+      if (content !== outer) outer.appendChild(content);
       fragment.appendChild(outer);
     }
 
@@ -48,7 +57,7 @@ async function loadPage(page) {
     if (data.page < data.total_pages) {
       const next = document.createElement('button');
       next.type = 'button';
-      next.dataset.testid = 'next-page';
+      next.dataset.testid = config.selectors.next_page;
       next.textContent = 'Next page';
       next.addEventListener('click', () => loadPage(data.page + 1));
       nav.appendChild(next);
