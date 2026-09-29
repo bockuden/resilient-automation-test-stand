@@ -5,10 +5,16 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 import resilient_automation_test_stand.main as app_module
-from resilient_automation_test_stand.main import app, configure_auth, configure_scenario_defaults
+from resilient_automation_test_stand.main import (
+    app,
+    configure_auth,
+    configure_scenario_defaults,
+    configure_selectors,
+)
 from resilient_automation_test_stand.presets import (
     ResolvedAuth,
     ScenarioDefaults,
+    SelectorConfig,
     load_preset_document,
 )
 
@@ -22,6 +28,7 @@ def anyio_backend() -> str:
 async def client() -> AsyncClient:
     configure_scenario_defaults(ScenarioDefaults())
     configure_auth(ResolvedAuth())
+    configure_selectors(SelectorConfig())
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as test_client:
         await test_client.post("/admin/reset")
@@ -30,6 +37,7 @@ async def client() -> AsyncClient:
         finally:
             configure_scenario_defaults(ScenarioDefaults())
             configure_auth(ResolvedAuth())
+            configure_selectors(SelectorConfig())
 
 
 @pytest.mark.anyio
@@ -53,7 +61,7 @@ async def test_catalog_static_assets_are_served(client: AsyncClient) -> None:
     script = await client.get("/static/catalog.js")
 
     assert stylesheet.status_code == 200
-    assert '[data-testid="catalog-item"]' in stylesheet.text
+    assert ".product-card," in stylesheet.text
     assert script.status_code == 200
     assert "async function loadPage(page)" in script.text
 
@@ -257,9 +265,56 @@ async def test_login_form_uses_the_catalog_visual_system(client: AsyncClient) ->
     assert 'class="hero login-hero"' in response.text
     assert 'class="workspace login-workspace"' in response.text
     assert 'class="login-form"' in response.text
-    assert 'id="username" name="username"' in response.text
-    assert 'id="password" name="password" type="password"' in response.text
+    assert 'id="username" name="username" data-testid="username"' in response.text
+    assert 'id="password" name="password" data-testid="password" type="password"' in response.text
     assert 'name="next_url" value="/catalog?protected=true"' in response.text
+
+
+@pytest.mark.anyio
+async def test_custom_login_test_ids_are_rendered_without_changing_form_names(
+    client: AsyncClient,
+) -> None:
+    configure_selectors(
+        SelectorConfig(
+            username="account-name",
+            password="account-secret",
+            login_button="submit-login",
+        )
+    )
+
+    response = await client.get("/login")
+
+    assert 'name="username" data-testid="account-name"' in response.text
+    assert 'name="password" data-testid="account-secret"' in response.text
+    assert 'type="submit" data-testid="submit-login"' in response.text
+
+
+@pytest.mark.anyio
+async def test_custom_catalog_test_ids_are_in_runtime_config_and_dom_renderer(
+    client: AsyncClient,
+) -> None:
+    configure_selectors(
+        SelectorConfig(
+            catalog="product-list",
+            item="product-card",
+            item_name="product-title",
+            item_price="product-cost",
+            next_page="page-forward",
+        )
+    )
+
+    response = await client.get("/catalog")
+    script = await client.get("/static/catalog.js")
+
+    assert 'data-testid="product-list"' in response.text
+    assert '"item": "product-card"' in response.text
+    assert '"item_name": "product-title"' in response.text
+    assert '"item_price": "product-cost"' in response.text
+    assert '"next_page": "page-forward"' in response.text
+    assert "config.selectors.item" in script.text
+    assert "config.selectors.next_page" in script.text
+    assert "textContent = item.name" in script.text
+    assert "innerHTML" not in script.text
 
 
 @pytest.mark.anyio
