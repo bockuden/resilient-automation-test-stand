@@ -102,12 +102,44 @@ class AuthConfig(BaseModel):
         )
 
 
+class SelectorConfig(BaseModel):
+    """Stable browser-facing data-testid tokens, not arbitrary CSS selectors."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    username: str = "username"
+    password: str = "password"
+    login_button: str = "login-submit"
+    catalog: str = "catalog"
+    item: str = "catalog-item"
+    item_name: str = "item-name"
+    item_price: str = "item-price"
+    next_page: str = "next-page"
+
+    @field_validator(
+        "username",
+        "password",
+        "login_button",
+        "catalog",
+        "item",
+        "item_name",
+        "item_price",
+        "next_page",
+    )
+    @classmethod
+    def validate_test_id_token(cls, value: str) -> str:
+        if re.fullmatch(r"[A-Za-z][A-Za-z0-9_.:-]*", value) is None:
+            raise ValueError("must be a data-testid token (letters, digits, '.', '_', ':', or '-')")
+        return value
+
+
 class PresetDocument(BaseModel):
     """Top-level shape of a scenario TOML file."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
     auth: AuthConfig = Field(default_factory=AuthConfig)
+    selectors: SelectorConfig = Field(default_factory=SelectorConfig)
     presets: dict[str, ScenarioDefaults] = Field(min_length=1)
     _resolved_auth: ResolvedAuth = PrivateAttr(default_factory=ResolvedAuth)
 

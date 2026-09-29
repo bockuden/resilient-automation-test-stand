@@ -7,6 +7,7 @@ from resilient_automation_test_stand.presets import (
     AuthConfig,
     PresetConfigError,
     ScenarioDefaults,
+    SelectorConfig,
     load_preset_document,
     preset_url,
 )
@@ -32,6 +33,37 @@ total_pages = 10
     assert document.auth == AuthConfig()
     assert document.resolved_auth.username == "demo"
     assert document.resolved_auth.password == "automation"
+    assert document.selectors == SelectorConfig()
+
+
+def test_custom_selector_tokens_load_from_toml(tmp_path: Path) -> None:
+    path = write_config(
+        tmp_path / "selectors.toml",
+        """
+[selectors]
+username = "account-name"
+password = "account-secret"
+login_button = "submit-login"
+catalog = "product-list"
+item = "product-card"
+item_name = "product-title"
+item_price = "product-cost"
+next_page = "page-forward"
+
+[presets.default]
+""",
+    )
+
+    assert load_preset_document(path).selectors == SelectorConfig(
+        username="account-name",
+        password="account-secret",
+        login_button="submit-login",
+        catalog="product-list",
+        item="product-card",
+        item_name="product-title",
+        item_price="product-cost",
+        next_page="page-forward",
+    )
 
 
 def test_custom_auth_credentials_load_from_toml(tmp_path: Path) -> None:
@@ -156,6 +188,8 @@ password_env = "EMPTY_TEST_PASSWORD"
         "[presets.wrong-type]\ntotal_pages = '10'\n",
         "[auth]\nusername = ''\n[presets.default]\n",
         "[auth]\nusername_env = 'NOT-VALID'\n[presets.default]\n",
+        "[selectors]\nitem = '[data-secret=\"x\"]'\n[presets.default]\n",
+        "[selectors]\nunknown = 'token'\n[presets.default]\n",
         "presets = 'not a table'\n",
     ],
 )

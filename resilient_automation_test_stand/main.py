@@ -11,7 +11,12 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from resilient_automation_test_stand.presets import ResolvedAuth, Scenario, ScenarioDefaults
+from resilient_automation_test_stand.presets import (
+    ResolvedAuth,
+    Scenario,
+    ScenarioDefaults,
+    SelectorConfig,
+)
 
 app = FastAPI(
     title="Resilient Browser Automation Test Stand",
@@ -25,6 +30,7 @@ app.mount(
 )
 app.state.scenario_defaults = ScenarioDefaults()
 app.state.auth = ResolvedAuth()
+app.state.selectors = SelectorConfig()
 
 request_attempts: dict[tuple[str, str, int], int] = defaultdict(int)
 
@@ -35,6 +41,10 @@ def configure_scenario_defaults(defaults: ScenarioDefaults) -> None:
 
 def configure_auth(auth: ResolvedAuth) -> None:
     app.state.auth = auth
+
+
+def configure_selectors(selectors: SelectorConfig) -> None:
+    app.state.selectors = selectors
 
 
 def _resolved_defaults(query: "CatalogQuery") -> ScenarioDefaults:
@@ -146,6 +156,7 @@ async def reset() -> dict[str, int]:
 )
 async def login_form(next_url: str = "/catalog") -> str:
     safe_next = escape(next_url, quote=True)
+    selectors: SelectorConfig = app.state.selectors
     return f"""
 <!doctype html>
 <html lang="en">
@@ -170,10 +181,10 @@ async def login_form(next_url: str = "/catalog") -> str:
         <form class="login-form" method="post" action="/login">
           <input type="hidden" name="next_url" value="{safe_next}">
           <label for="username">Username</label>
-          <input id="username" name="username" autocomplete="username" required>
+          <input id="username" name="username" data-testid="{escape(selectors.username, quote=True)}" autocomplete="username" required>
           <label for="password">Password</label>
-          <input id="password" name="password" type="password" autocomplete="current-password" required>
-          <button type="submit">Sign in</button>
+          <input id="password" name="password" data-testid="{escape(selectors.password, quote=True)}" type="password" autocomplete="current-password" required>
+          <button type="submit" data-testid="{escape(selectors.login_button, quote=True)}">Sign in</button>
         </form>
       </section>
     </main>
@@ -248,6 +259,7 @@ async def catalog(
         "failureDelayMs": defaults.failure_delay_ms,
         "failPage": defaults.fail_page,
         "totalPages": defaults.total_pages,
+        "selectors": app.state.selectors.model_dump(),
     }
     return HTMLResponse(_catalog_html(config))
 
@@ -347,7 +359,7 @@ def _catalog_html(config: dict[str, object]) -> str:
       <p id="scenario" class="scenario-pill">Scenario: <strong>{escape(str(config["scenario"]))}</strong></p>
       <section class="workspace" aria-label="Catalog result">
         <p id="status" role="status" data-state="loading">Loading page 1...</p>
-        <section id="catalog" data-testid="catalog"></section>
+        <section id="catalog" class="catalog-items" data-testid="{escape(str(config["selectors"]["catalog"]), quote=True)}"></section>
         <nav aria-label="Catalog pagination"></nav>
       </section>
     </main>

@@ -2,6 +2,17 @@
 username = "demo"
 password_env = "TEST_PASSWORD"
 
+[selectors]
+# These values are stable data-testid tokens, not CSS selector expressions.
+username = "username"
+password = "password"
+login_button = "login-submit"
+catalog = "catalog"
+item = "catalog-item"
+item_name = "item-name"
+item_price = "item-price"
+next_page = "next-page"
+
 [presets.ten-pages]
 scenario = "success"
 total_pages = 10

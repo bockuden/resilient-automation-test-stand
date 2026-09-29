@@ -4,6 +4,8 @@
 
 ### Added
 
+- Added configurable stable `data-testid` tokens for login and catalog elements,
+  preserving all existing locator defaults and login field names.
 - Added global TOML authentication credentials with environment-variable
   overrides while preserving the built-in `demo` / `automation` defaults.
 - Replaced visible demo credentials on the login page with a neutral hint.
@@ -12,7 +14,9 @@
 
 Existing preset files and protected login flows continue to work unchanged.
 Authentication remains enabled per scenario with `protected=true`; credentials
-are resolved once from the global config and environment.
+are resolved once from the global config and environment. Existing browser
+locator tokens and login field names remain the defaults unless the optional
+`[selectors]` table is configured.
 
 ## 1.1.5 - 2026-07-28
 

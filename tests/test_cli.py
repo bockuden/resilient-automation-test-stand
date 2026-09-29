@@ -8,17 +8,20 @@ from resilient_automation_test_stand.main import (
     app,
     configure_auth,
     configure_scenario_defaults,
+    configure_selectors,
 )
-from resilient_automation_test_stand.presets import ResolvedAuth, ScenarioDefaults
+from resilient_automation_test_stand.presets import ResolvedAuth, ScenarioDefaults, SelectorConfig
 
 
 @pytest.fixture(autouse=True)
 def reset_server_defaults() -> Iterator[None]:
     configure_scenario_defaults(ScenarioDefaults())
     configure_auth(ResolvedAuth())
+    configure_selectors(SelectorConfig())
     yield
     configure_scenario_defaults(ScenarioDefaults())
     configure_auth(ResolvedAuth())
+    configure_selectors(SelectorConfig())
 
 
 @pytest.fixture
@@ -132,6 +135,27 @@ password = "config-password"
     assert app.state.scenario_defaults == ScenarioDefaults()
 
 
+def test_cli_config_without_preset_applies_global_selectors(
+    config_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path.write_text(
+        """
+[selectors]
+catalog = "product-list"
+next_page = "page-forward"
+
+[presets.default]
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cli.uvicorn, "run", lambda *_args, **_kwargs: None)
+
+    cli.main(["--config", str(config_path)])
+
+    assert app.state.selectors == SelectorConfig(catalog="product-list", next_page="page-forward")
+
+
 def test_cli_config_and_preset_apply_global_auth_and_scenario(
     config_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -174,6 +198,9 @@ def test_print_url_does_not_expose_auth_or_environment_values(
     path = tmp_path / "auth.toml"
     path.write_text(
         """
+[selectors]
+catalog = "private-locator-token"
+
 [auth]
 username = "literal-secret-user"
 password = "literal-secret-password"
@@ -196,6 +223,7 @@ protected = true
         "literal-secret-password",
         "URL_TEST_USERNAME",
         "URL_TEST_PASSWORD",
+        "private-locator-token",
     ):
         assert secret not in output
 
