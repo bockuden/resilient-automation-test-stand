@@ -209,6 +209,32 @@ cookie for the following `/catalog` request. Authentication protects the
 browser catalog route; `/api/catalog` remains directly accessible for API-only
 tests.
 
+## Stable browser locators
+
+Browser elements expose configurable `data-testid` tokens. The defaults keep
+existing automation working: `username`, `password`, `login-submit`, `catalog`,
+`catalog-item`, `item-name`, `item-price`, and `next-page`. The login form also
+keeps its `name="username"` and `name="password"` fields.
+
+Set tokens in the same TOML file used for presets. Values are tokens, not CSS
+selectors; they may contain letters, digits, `.`, `_`, `:`, and `-`:
+
+```toml
+[selectors]
+username = "account-name"
+password = "account-secret"
+login_button = "submit-login"
+catalog = "product-list"
+item = "product-card"
+item_name = "product-title"
+item_price = "product-cost"
+next_page = "page-forward"
+```
+
+Start the server with `automation-test-stand --config scenarios.toml` to apply
+the settings, with or without `--preset`. Locator settings are sent to the
+browser page at runtime and are never included in URLs printed by `--print-url`.
+
 ## Scenario cookbook
 
 Start the server first, then use one of the commands below. Protected scenarios
@@ -335,7 +361,7 @@ automation-test-stand --config examples/scenarios.toml --preset login-delayed-re
 
 `--print-url` emits a URL that is self-contained with respect to scenario
 parameters. Server-level authentication still comes from the TOML config and
-environment. `--config` applies global auth settings even without `--preset`;
+environment. `--config` applies global auth and stable locator settings even without `--preset`;
 `--preset` additionally starts the server with that preset as its scenario
 defaults. An explicit query parameter overrides only the matching preset
 field, so the following URL uses the preset's ten pages but disables its
