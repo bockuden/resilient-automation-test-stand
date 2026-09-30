@@ -8,6 +8,7 @@ from resilient_automation_test_stand.presets import (
     PresetConfigError,
     ScenarioDefaults,
     SelectorConfig,
+    SelectorFailureConfig,
     load_preset_document,
     preset_url,
 )
@@ -64,6 +65,41 @@ next_page = "page-forward"
         item_price="product-cost",
         next_page="page-forward",
     )
+
+
+@pytest.mark.parametrize(
+    ("mode", "target"),
+    [
+        ("missing", "next_page"),
+        ("changed", "item"),
+        ("multiple", "login_button"),
+        ("delayed", "next_page"),
+        ("hidden", "item"),
+        ("disabled", "login_button"),
+    ],
+)
+def test_selector_failure_modes_load_from_preset(
+    tmp_path: Path,
+    mode: str,
+    target: str,
+) -> None:
+    page = 1 if target == "login_button" else 2
+    path = write_config(
+        tmp_path / "selector-failures.toml",
+        f"""
+[presets.selector-test]
+scenario = "selector-failure"
+
+[presets.selector-test.selector_failure]
+target = "{target}"
+mode = "{mode}"
+page = {page}
+""",
+    )
+
+    failure = load_preset_document(path).presets["selector-test"].selector_failure
+
+    assert failure == SelectorFailureConfig(target=target, mode=mode, page=page)
 
 
 def test_custom_auth_credentials_load_from_toml(tmp_path: Path) -> None:
@@ -190,6 +226,10 @@ password_env = "EMPTY_TEST_PASSWORD"
         "[auth]\nusername_env = 'NOT-VALID'\n[presets.default]\n",
         "[selectors]\nitem = '[data-secret=\"x\"]'\n[presets.default]\n",
         "[selectors]\nunknown = 'token'\n[presets.default]\n",
+        '[presets.invalid.selector_failure]\ntarget = "other"\nmode = "missing"\n',
+        '[presets.invalid.selector_failure]\ntarget = "item"\nmode = "random"\n',
+        '[presets.invalid.selector_failure]\ntarget = "next_page"\nmode = "delayed"\ndelay_ms = 5001\n',
+        '[presets.invalid.selector_failure]\ntarget = "login_button"\nmode = "hidden"\npage = 2\n',
         "presets = 'not a table'\n",
     ],
 )
@@ -231,3 +271,21 @@ def test_preset_url_contains_complete_portable_scenario() -> None:
     assert query["total_pages"] == ["10"]
     assert query["fail_for"] == ["2"]
     assert query["failure_delay_ms"] == ["1500"]
+
+
+def test_preset_url_flattens_selector_failure_settings() -> None:
+    url = preset_url(
+        "selector-missing",
+        ScenarioDefaults(
+            scenario="selector-failure",
+            selector_failure=SelectorFailureConfig(target="next_page", mode="missing", page=2),
+        ),
+        "http://localhost:8080/catalog",
+    )
+
+    query = parse_qs(urlsplit(url).query)
+    assert query["scenario"] == ["selector-failure"]
+    assert query["selector_failure_target"] == ["next_page"]
+    assert query["selector_failure_mode"] == ["missing"]
+    assert query["selector_failure_page"] == ["2"]
+    assert query["selector_failure_delay_ms"] == ["500"]

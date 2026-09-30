@@ -15,6 +15,7 @@ from resilient_automation_test_stand.presets import (
     ResolvedAuth,
     ScenarioDefaults,
     SelectorConfig,
+    SelectorFailureConfig,
     load_preset_document,
 )
 
@@ -128,6 +129,10 @@ def test_openapi_preserves_catalog_query_parameter_contract() -> None:
         "failure_delay_ms",
         "fail_page",
         "total_pages",
+        "selector_failure_target",
+        "selector_failure_mode",
+        "selector_failure_page",
+        "selector_failure_delay_ms",
     }
     assert set(catalog_parameters) == common_parameters | {"protected"}
     assert set(api_parameters) == common_parameters | {"page"}
@@ -315,6 +320,150 @@ async def test_custom_catalog_test_ids_are_in_runtime_config_and_dom_renderer(
     assert "config.selectors.next_page" in script.text
     assert "textContent = item.name" in script.text
     assert "innerHTML" not in script.text
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("mode", "expected"),
+    [
+        ("missing", '<button type="submit">Sign in</button>'),
+        ("changed", 'data-testid="login-submit-changed"'),
+        ("multiple", 'data-testid="login-submit"'),
+        ("delayed", "setTimeout"),
+        ("hidden", "hidden>Sign in</button>"),
+        ("disabled", "disabled>Sign in</button>"),
+    ],
+)
+async def test_login_button_selector_failure_modes(
+    client: AsyncClient,
+    mode: str,
+    expected: str,
+) -> None:
+    response = await client.get(
+        "/login?next_url=%2Fcatalog%3Fscenario%3Dselector-failure"
+        f"&selector_failure_target=login_button&selector_failure_mode={mode}"
+    )
+
+    assert response.status_code == 200
+    assert expected in response.text
+    if mode == "multiple":
+        assert response.text.count('data-testid="login-submit"') == 2
+
+
+@pytest.mark.anyio
+async def test_selector_failure_is_page_and_target_scoped_and_deterministic(
+    client: AsyncClient,
+) -> None:
+    failure = SelectorFailureConfig(target="item", mode="hidden", page=2)
+    configure_scenario_defaults(
+        ScenarioDefaults(scenario="selector-failure", total_pages=3, selector_failure=failure)
+    )
+
+    first = await client.get("/catalog?run_id=scoped-failure")
+    second = await client.get("/catalog?run_id=scoped-failure")
+    other_scenario = await client.get("/catalog?scenario=success&run_id=scoped-failure")
+    out_of_range = await client.get(
+        "/catalog?scenario=selector-failure&total_pages=1&run_id=scoped-failure"
+    )
+
+    assert first.text == second.text
+    assert (
+        '"selectorFailure": {"target": "item", "mode": "hidden", "page": 2, "delayMs": 500}'
+        in first.text
+    )
+    assert '"selectorFailure": null' in other_scenario.text
+    assert '"selectorFailure": null' in out_of_range.text
+
+
+@pytest.mark.anyio
+async def test_selector_failure_query_overrides_target_and_page(client: AsyncClient) -> None:
+    response = await client.get(
+        "/catalog?scenario=selector-failure&total_pages=3&selector_failure_target=next_page"
+        "&selector_failure_mode=disabled&selector_failure_page=2"
+    )
+
+    assert response.status_code == 200
+    assert (
+        '"selectorFailure": {"target": "next_page", "mode": "disabled", "page": 2, "delayMs": 500}'
+        in response.text
+    )
+
+
+@pytest.mark.anyio
+async def test_selector_failure_rejects_incomplete_and_invalid_query_config(
+    client: AsyncClient,
+) -> None:
+    incomplete = await client.get("/catalog?scenario=selector-failure&selector_failure_target=item")
+    invalid_mode = await client.get(
+        "/catalog?scenario=selector-failure&selector_failure_target=item"
+        "&selector_failure_mode=unknown"
+    )
+    invalid_login_page = await client.get(
+        "/catalog?scenario=selector-failure&selector_failure_target=login_button"
+        "&selector_failure_mode=missing&selector_failure_page=2"
+    )
+
+    assert incomplete.status_code == 422
+    assert invalid_mode.status_code == 422
+    assert invalid_login_page.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_selector_failure_api_scenario_keeps_deterministic_catalog_payload(
+    client: AsyncClient,
+) -> None:
+    response = await client.get(
+        "/api/catalog?scenario=selector-failure&run_id=selector-api&"
+        "selector_failure_target=item&selector_failure_mode=multiple&selector_failure_page=2&page=2"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["scenario"] == "selector-failure"
+    assert payload["page"] == 2
+    assert len(payload["items"]) == 5
+
+
+@pytest.mark.anyio
+async def test_protected_selector_failure_preserves_login_button_configuration(
+    client: AsyncClient,
+) -> None:
+    configure_scenario_defaults(
+        ScenarioDefaults(
+            scenario="selector-failure",
+            protected=True,
+            selector_failure=SelectorFailureConfig(target="login_button", mode="hidden"),
+        )
+    )
+
+    catalog_response = await client.get("/catalog")
+    login_response = await client.get(catalog_response.headers["location"])
+
+    assert catalog_response.status_code == 303
+    assert login_response.status_code == 200
+    assert 'data-testid="login-submit" hidden' in login_response.text
+
+
+@pytest.mark.anyio
+async def test_dom_change_scenario_keeps_its_existing_structure(client: AsyncClient) -> None:
+    response = await client.get("/catalog?scenario=dom-change")
+    script = await client.get("/static/catalog.js")
+
+    assert '"selectorFailure": null' in response.text
+    assert "'article' : 'div'" in script.text
+    assert "'result-tile-v2' : 'product-card'" in script.text
+    assert "content.className = 'content'" in script.text
+    assert "failure?.target === target && failure.page === page" in script.text
+    assert "setFailureState(outer, 'item', data.page" in script.text
+    assert "setFailureState(next, 'next_page', data.page" in script.text
+    assert "mode === 'missing'" in script.text
+    assert "mode === 'changed'" in script.text
+    assert "itemMode === 'multiple'" in script.text
+    assert "itemMode === 'delayed'" in script.text
+    assert "mode === 'hidden'" in script.text
+    assert "mode === 'disabled'" in script.text
+    assert "nextMode === 'multiple'" in script.text
+    assert "nextMode === 'delayed'" in script.text
 
 
 @pytest.mark.anyio
