@@ -10,7 +10,15 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 Scenario = Literal[
     "success",
@@ -20,7 +28,28 @@ Scenario = Literal[
     "resume",
     "dom-change",
     "duplicates",
+    "selector-failure",
 ]
+
+SelectorFailureTarget = Literal["login_button", "item", "next_page"]
+SelectorFailureMode = Literal["missing", "changed", "multiple", "delayed", "hidden", "disabled"]
+
+
+class SelectorFailureConfig(BaseModel):
+    """A deterministic, page-scoped browser locator failure."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    target: SelectorFailureTarget
+    mode: SelectorFailureMode
+    page: int = Field(default=1, ge=1, le=20)
+    delay_ms: int = Field(default=500, ge=1, le=5000)
+
+    @model_validator(mode="after")
+    def validate_login_button_page(self) -> "SelectorFailureConfig":
+        if self.target == "login_button" and self.page != 1:
+            raise ValueError("login_button selector failures apply only to page 1")
+        return self
 
 
 class ScenarioDefaults(BaseModel):
@@ -35,6 +64,7 @@ class ScenarioDefaults(BaseModel):
     failure_delay_ms: int = Field(default=0, ge=0, le=30_000)
     delay_ms: int = Field(default=1500, ge=0, le=30_000)
     fail_page: int = Field(default=3, ge=1, le=20)
+    selector_failure: SelectorFailureConfig | None = None
 
 
 class ResolvedAuth(BaseModel):
@@ -196,7 +226,13 @@ def preset_url(
 ) -> str:
     parts = urlsplit(base_url)
     query = list(parse_qsl(parts.query, keep_blank_values=True))
-    values = {"run_id": preset_name, **preset.model_dump()}
+    preset_values = preset.model_dump()
+    selector_failure = preset_values.pop("selector_failure")
+    values = {"run_id": preset_name, **preset_values}
+    if selector_failure is not None:
+        values.update(
+            {f"selector_failure_{name}": value for name, value in selector_failure.items()}
+        )
     query.extend(
         (name, str(value).lower() if isinstance(value, bool) else str(value))
         for name, value in values.items()

@@ -4,6 +4,8 @@
 
 ### Added
 
+- Added deterministic browser selector failure scenarios for missing, changed,
+  multiple, delayed, hidden, and disabled locators scoped to a target and page.
 - Added configurable stable `data-testid` tokens for login and catalog elements,
   preserving all existing locator defaults and login field names.
 - Added global TOML authentication credentials with environment-variable
@@ -16,7 +18,8 @@ Existing preset files and protected login flows continue to work unchanged.
 Authentication remains enabled per scenario with `protected=true`; credentials
 are resolved once from the global config and environment. Existing browser
 locator tokens and login field names remain the defaults unless the optional
-`[selectors]` table is configured.
+`[selectors]` table is configured. The selector-failure scenario is additive;
+existing catalog API payloads and the `dom-change` behavior remain unchanged.
 
 ## 1.1.5 - 2026-07-28
 

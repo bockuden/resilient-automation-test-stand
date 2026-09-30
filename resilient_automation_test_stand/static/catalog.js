@@ -5,6 +5,31 @@ const status = document.querySelector('#status');
 const nav = document.querySelector('nav');
 catalog.dataset.testid = config.selectors.catalog;
 
+function failureMode(target, page) {
+  const failure = config.selectorFailure;
+  return config.scenario === 'selector-failure' && failure?.target === target && failure.page === page
+    ? failure.mode
+    : null;
+}
+
+function setFailureState(element, target, page, testId) {
+  const mode = failureMode(target, page);
+  if (mode === 'missing') {
+    element.removeAttribute('data-testid');
+  } else if (mode === 'changed') {
+    element.dataset.testid = `${testId}-changed`;
+  } else {
+    element.dataset.testid = testId;
+  }
+  if (mode === 'hidden') element.hidden = true;
+  if (mode === 'disabled') {
+    if (element instanceof HTMLButtonElement) element.disabled = true;
+    else element.setAttribute('aria-disabled', 'true');
+  }
+}
+
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
 async function loadPage(page) {
   status.textContent = `Loading page ${page}...`;
   status.dataset.state = 'loading';
@@ -33,7 +58,7 @@ async function loadPage(page) {
     for (const item of data.items) {
       const outer = document.createElement(config.scenario === 'dom-change' ? 'article' : 'div');
       outer.className = config.scenario === 'dom-change' ? 'result-tile-v2' : 'product-card';
-      outer.dataset.testid = config.selectors.item;
+      setFailureState(outer, 'item', data.page, config.selectors.item);
       outer.dataset.itemId = item.id;
       const content = config.scenario === 'dom-change' ? document.createElement('div') : outer;
       if (config.scenario === 'dom-change') content.className = 'content';
@@ -50,17 +75,29 @@ async function loadPage(page) {
       fragment.appendChild(outer);
     }
 
+    const itemMode = failureMode('item', data.page);
+    if (itemMode === 'delayed') await wait(config.selectorFailure.delayMs);
     catalog.appendChild(fragment);
+    if (itemMode === 'multiple' && catalog.firstElementChild) {
+      catalog.appendChild(catalog.firstElementChild.cloneNode(true));
+    }
     status.textContent = `Page ${data.page} loaded on attempt ${data.attempt}`;
     status.dataset.state = 'success';
 
     if (data.page < data.total_pages) {
+      const nextMode = failureMode('next_page', data.page);
+      if (nextMode === 'delayed') await wait(config.selectorFailure.delayMs);
       const next = document.createElement('button');
       next.type = 'button';
-      next.dataset.testid = config.selectors.next_page;
+      setFailureState(next, 'next_page', data.page, config.selectors.next_page);
       next.textContent = 'Next page';
       next.addEventListener('click', () => loadPage(data.page + 1));
       nav.appendChild(next);
+      if (nextMode === 'multiple') {
+        const duplicate = next.cloneNode(true);
+        duplicate.addEventListener('click', () => loadPage(data.page + 1));
+        nav.appendChild(duplicate);
+      }
     }
   } catch (error) {
     status.textContent = `Catalog error: ${error.message}`;

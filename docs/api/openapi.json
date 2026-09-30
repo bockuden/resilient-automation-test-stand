@@ -79,7 +79,8 @@
               "slow",
               "resume",
               "dom-change",
-              "duplicates"
+              "duplicates",
+              "selector-failure"
             ],
             "title": "Scenario",
             "type": "string"
@@ -204,7 +205,8 @@
                     "slow",
                     "resume",
                     "dom-change",
-                    "duplicates"
+                    "duplicates",
+                    "selector-failure"
                   ],
                   "type": "string"
                 },
@@ -326,6 +328,95 @@
               ],
               "description": "Number of pages exposed by the catalog.",
               "title": "Total Pages"
+            }
+          },
+          {
+            "description": "Browser locator target for the selector-failure scenario.",
+            "in": "query",
+            "name": "selector_failure_target",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "login_button",
+                    "item",
+                    "next_page"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Browser locator target for the selector-failure scenario.",
+              "title": "Selector Failure Target"
+            }
+          },
+          {
+            "description": "Deterministic failure mode for the configured browser locator.",
+            "in": "query",
+            "name": "selector_failure_mode",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "missing",
+                    "changed",
+                    "multiple",
+                    "delayed",
+                    "hidden",
+                    "disabled"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Deterministic failure mode for the configured browser locator.",
+              "title": "Selector Failure Mode"
+            }
+          },
+          {
+            "description": "Catalog page where the locator failure is activated.",
+            "in": "query",
+            "name": "selector_failure_page",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 20,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Catalog page where the locator failure is activated.",
+              "title": "Selector Failure Page"
+            }
+          },
+          {
+            "description": "Bounded delay before a configured locator appears.",
+            "in": "query",
+            "name": "selector_failure_delay_ms",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 5000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Bounded delay before a configured locator appears.",
+              "title": "Selector Failure Delay Ms"
             }
           },
           {
@@ -394,7 +485,8 @@
                     "slow",
                     "resume",
                     "dom-change",
-                    "duplicates"
+                    "duplicates",
+                    "selector-failure"
                   ],
                   "type": "string"
                 },
@@ -516,6 +608,95 @@
               ],
               "description": "Number of pages exposed by the catalog.",
               "title": "Total Pages"
+            }
+          },
+          {
+            "description": "Browser locator target for the selector-failure scenario.",
+            "in": "query",
+            "name": "selector_failure_target",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "login_button",
+                    "item",
+                    "next_page"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Browser locator target for the selector-failure scenario.",
+              "title": "Selector Failure Target"
+            }
+          },
+          {
+            "description": "Deterministic failure mode for the configured browser locator.",
+            "in": "query",
+            "name": "selector_failure_mode",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "missing",
+                    "changed",
+                    "multiple",
+                    "delayed",
+                    "hidden",
+                    "disabled"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Deterministic failure mode for the configured browser locator.",
+              "title": "Selector Failure Mode"
+            }
+          },
+          {
+            "description": "Catalog page where the locator failure is activated.",
+            "in": "query",
+            "name": "selector_failure_page",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 20,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Catalog page where the locator failure is activated.",
+              "title": "Selector Failure Page"
+            }
+          },
+          {
+            "description": "Bounded delay before a configured locator appears.",
+            "in": "query",
+            "name": "selector_failure_delay_ms",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 5000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Bounded delay before a configured locator appears.",
+              "title": "Selector Failure Delay Ms"
             }
           },
           {
@@ -617,6 +798,87 @@
               "default": "/catalog",
               "title": "Next Url",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "selector_failure_target",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "login_button",
+                    "item",
+                    "next_page"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Selector Failure Target"
+            }
+          },
+          {
+            "in": "query",
+            "name": "selector_failure_mode",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "missing",
+                    "changed",
+                    "multiple",
+                    "delayed",
+                    "hidden",
+                    "disabled"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Selector Failure Mode"
+            }
+          },
+          {
+            "in": "query",
+            "name": "selector_failure_page",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 20,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Selector Failure Page"
+            }
+          },
+          {
+            "in": "query",
+            "name": "selector_failure_delay_ms",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 5000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Selector Failure Delay Ms"
             }
           }
         ],

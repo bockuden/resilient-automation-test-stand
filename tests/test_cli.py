@@ -10,7 +10,12 @@ from resilient_automation_test_stand.main import (
     configure_scenario_defaults,
     configure_selectors,
 )
-from resilient_automation_test_stand.presets import ResolvedAuth, ScenarioDefaults, SelectorConfig
+from resilient_automation_test_stand.presets import (
+    ResolvedAuth,
+    ScenarioDefaults,
+    SelectorConfig,
+    SelectorFailureConfig,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -186,6 +191,34 @@ failure_delay_ms = 1500
     assert app.state.scenario_defaults.scenario == "transient"
     assert app.state.scenario_defaults.protected is True
     assert app.state.scenario_defaults.total_pages == 10
+
+
+def test_cli_applies_selector_failure_preset(
+    config_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path.write_text(
+        """
+[presets.selector-missing]
+scenario = "selector-failure"
+total_pages = 4
+
+[presets.selector-missing.selector_failure]
+target = "next_page"
+mode = "missing"
+page = 2
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cli.uvicorn, "run", lambda *_args, **_kwargs: None)
+
+    cli.main(["--config", str(config_path), "--preset", "selector-missing"])
+
+    assert app.state.scenario_defaults.selector_failure == SelectorFailureConfig(
+        target="next_page",
+        mode="missing",
+        page=2,
+    )
 
 
 def test_print_url_does_not_expose_auth_or_environment_values(

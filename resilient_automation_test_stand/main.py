@@ -4,18 +4,21 @@ from collections import defaultdict
 from html import escape
 from pathlib import Path
 from typing import Annotated
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 from fastapi import Cookie, FastAPI, Form, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from resilient_automation_test_stand.presets import (
     ResolvedAuth,
     Scenario,
     ScenarioDefaults,
     SelectorConfig,
+    SelectorFailureConfig,
+    SelectorFailureMode,
+    SelectorFailureTarget,
 )
 
 app = FastAPI(
@@ -50,8 +53,43 @@ def configure_selectors(selectors: SelectorConfig) -> None:
 def _resolved_defaults(query: "CatalogQuery") -> ScenarioDefaults:
     current: ScenarioDefaults = app.state.scenario_defaults
     values = current.model_dump()
-    values.update(query.model_dump(exclude_none=True, exclude={"page", "run_id"}))
+    values.update(
+        query.model_dump(
+            exclude_none=True,
+            exclude={
+                "page",
+                "run_id",
+                "selector_failure_target",
+                "selector_failure_mode",
+                "selector_failure_page",
+                "selector_failure_delay_ms",
+            },
+        )
+    )
+    if query.selector_failure_target is not None:
+        values["selector_failure"] = SelectorFailureConfig(
+            target=query.selector_failure_target,
+            mode=query.selector_failure_mode,
+            page=query.selector_failure_page or 1,
+            delay_ms=query.selector_failure_delay_ms or 500,
+        )
     return ScenarioDefaults.model_validate(values)
+
+
+def _runtime_selector_failure(defaults: ScenarioDefaults) -> dict[str, object] | None:
+    failure = defaults.selector_failure
+    if (
+        defaults.scenario != "selector-failure"
+        or failure is None
+        or failure.page > defaults.total_pages
+    ):
+        return None
+    return {
+        "target": failure.target,
+        "mode": failure.mode,
+        "page": failure.page,
+        "delayMs": failure.delay_ms,
+    }
 
 
 class CatalogItem(BaseModel):
@@ -107,6 +145,45 @@ class CatalogQuery(BaseModel):
         le=20,
         description="Number of pages exposed by the catalog.",
     )
+    selector_failure_target: SelectorFailureTarget | None = Field(
+        default=None,
+        description="Browser locator target for the selector-failure scenario.",
+    )
+    selector_failure_mode: SelectorFailureMode | None = Field(
+        default=None,
+        description="Deterministic failure mode for the configured browser locator.",
+    )
+    selector_failure_page: int | None = Field(
+        default=None,
+        ge=1,
+        le=20,
+        description="Catalog page where the locator failure is activated.",
+    )
+    selector_failure_delay_ms: int | None = Field(
+        default=None,
+        ge=1,
+        le=5000,
+        description="Bounded delay before a configured locator appears.",
+    )
+
+    @model_validator(mode="after")
+    def validate_selector_failure_query(self) -> "CatalogQuery":
+        if (self.selector_failure_target is None) != (self.selector_failure_mode is None):
+            raise ValueError(
+                "selector_failure_target and selector_failure_mode must be set together"
+            )
+        if self.selector_failure_target is None and (
+            self.selector_failure_page is not None or self.selector_failure_delay_ms is not None
+        ):
+            raise ValueError(
+                "selector_failure_page and selector_failure_delay_ms require a target and mode"
+            )
+        if self.selector_failure_target == "login_button" and self.selector_failure_page not in (
+            None,
+            1,
+        ):
+            raise ValueError("login_button selector failures apply only to page 1")
+        return self
 
 
 class CatalogShellQuery(CatalogQuery):
@@ -154,9 +231,61 @@ async def reset() -> dict[str, int]:
     summary="Render the demo login form",
     description="Renders the configured-credential form used by protected catalog scenarios.",
 )
-async def login_form(next_url: str = "/catalog") -> str:
+async def login_form(
+    next_url: str = "/catalog",
+    selector_failure_target: SelectorFailureTarget | None = None,
+    selector_failure_mode: SelectorFailureMode | None = None,
+    selector_failure_page: Annotated[int | None, Query(ge=1, le=20)] = None,
+    selector_failure_delay_ms: Annotated[int | None, Query(ge=1, le=5000)] = None,
+) -> str:
     safe_next = escape(next_url, quote=True)
     selectors: SelectorConfig = app.state.selectors
+    requested_scenario = parse_qs(urlsplit(next_url).query).get("scenario")
+    failure = None
+    if (
+        requested_scenario == ["selector-failure"]
+        and selector_failure_target == "login_button"
+        and selector_failure_mode is not None
+        and selector_failure_page in (None, 1)
+    ):
+        failure = SelectorFailureConfig(
+            target="login_button",
+            mode=selector_failure_mode,
+            page=1,
+            delay_ms=selector_failure_delay_ms or 500,
+        )
+
+    login_test_id = selectors.login_button
+    login_test_id_attr = f' data-testid="{escape(login_test_id, quote=True)}"'
+    login_button_id = ""
+    login_button_hidden = ""
+    login_button_disabled = ""
+    login_button_duplicate = ""
+    login_button_script = ""
+    if failure is not None:
+        if failure.mode == "missing":
+            login_test_id_attr = ""
+        elif failure.mode == "changed":
+            login_test_id_attr = f' data-testid="{escape(login_test_id + "-changed", quote=True)}"'
+        elif failure.mode == "multiple":
+            login_button_duplicate = (
+                f'<button type="submit" data-testid="{escape(login_test_id, quote=True)}">'
+                "Sign in (duplicate)</button>"
+            )
+        elif failure.mode == "delayed":
+            login_button_id = ' id="login-submit-control"'
+            login_button_hidden = " hidden"
+            login_button_script = (
+                "<script>setTimeout(() => { const button = "
+                "document.getElementById('login-submit-control'); "
+                f"button.dataset.testid = {json.dumps(login_test_id)}; "
+                "button.hidden = false; }, "
+                f"{failure.delay_ms});</script>"
+            )
+        elif failure.mode == "hidden":
+            login_button_hidden = " hidden"
+        elif failure.mode == "disabled":
+            login_button_disabled = " disabled"
     return f"""
 <!doctype html>
 <html lang="en">
@@ -184,8 +313,10 @@ async def login_form(next_url: str = "/catalog") -> str:
           <input id="username" name="username" data-testid="{escape(selectors.username, quote=True)}" autocomplete="username" required>
           <label for="password">Password</label>
           <input id="password" name="password" data-testid="{escape(selectors.password, quote=True)}" type="password" autocomplete="current-password" required>
-          <button type="submit" data-testid="{escape(selectors.login_button, quote=True)}">Sign in</button>
+          <button{login_button_id} type="submit"{login_test_id_attr}{login_button_hidden}{login_button_disabled}>Sign in</button>
+          {login_button_duplicate}
         </form>
+        {login_button_script}
       </section>
     </main>
   </body>
@@ -236,6 +367,14 @@ async def catalog(
     defaults = _resolved_defaults(query)
 
     if defaults.protected and demo_session != "authenticated":
+        failure_query = (
+            {
+                f"selector_failure_{name}": value
+                for name, value in defaults.selector_failure.model_dump().items()
+            }
+            if defaults.selector_failure is not None
+            else {}
+        )
         target_query = urlencode(
             {
                 "scenario": defaults.scenario,
@@ -246,9 +385,10 @@ async def catalog(
                 "fail_page": defaults.fail_page,
                 "total_pages": defaults.total_pages,
                 "protected": "true",
+                **failure_query,
             }
         )
-        login_query = urlencode({"next_url": f"/catalog?{target_query}"})
+        login_query = urlencode({"next_url": f"/catalog?{target_query}", **failure_query})
         return RedirectResponse(f"/login?{login_query}", status_code=303)
 
     config = {
@@ -260,6 +400,7 @@ async def catalog(
         "failPage": defaults.fail_page,
         "totalPages": defaults.total_pages,
         "selectors": app.state.selectors.model_dump(),
+        "selectorFailure": _runtime_selector_failure(defaults),
     }
     return HTMLResponse(_catalog_html(config))
 
