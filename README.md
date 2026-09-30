@@ -74,6 +74,7 @@ across an ordered sequence of requests.
 | `resume` | Only `fail_page` returns `500`; the other pages remain available. | It persists a checkpoint and resumes without reprocessing completed pages. |
 | `duplicates` | Each page after the first begins with the previous page's final item ID. | It deduplicates records across pagination boundaries. |
 | `dom-change` | CSS classes and element nesting change while stable `data-testid` locators remain. | It uses semantic or stable locators rather than DOM shape. |
+| `selector-failure` | One configured browser locator is missing, changed, duplicated, delayed, hidden, or disabled on a selected page. | It retries locator strategies and applies a fallback only when the target is unavailable. |
 | `protected=true` | The browser route redirects through the configured login and back to the original catalog URL. | It preserves the session cookie and return URL. |
 
 ## Where WireMock and Toxiproxy fit
@@ -349,7 +350,7 @@ transient recovery, login, DOM changes, duplicates, resume, and cancellation.
 For repeated scenarios, the same values can be stored in a TOML file instead
 of copied into every startup command. The repository includes
 [`examples/scenarios.toml`](https://github.com/bockuden/resilient-automation-test-stand/blob/main/examples/scenarios.toml) with the three cookbook
-scenarios above.
+scenarios above and a selector-failure preset.
 
 These CLI commands are identical in PowerShell, Linux, and macOS shells:
 
@@ -381,6 +382,27 @@ total_pages = 10
 fail_for = 2
 failure_delay_ms = 1500
 ```
+
+To simulate a missing next-page locator on page 2, add a selector failure to a
+preset. Supported targets are `login_button`, `item`, and `next_page`; modes
+are `missing`, `changed`, `multiple`, `delayed`, `hidden`, and `disabled`.
+Failures affect only their configured target and page. The delayed mode waits
+between 1 and 5000 ms (default 500 ms). A `login_button` failure applies on
+page 1; a catalog target beyond `total_pages` is ignored.
+
+```toml
+[presets.selector-missing]
+scenario = "selector-failure"
+
+[presets.selector-missing.selector_failure]
+target = "next_page"
+mode = "missing"
+page = 2
+```
+
+Use `--config examples/scenarios.toml --preset selector-missing` to run the
+scenario. `--print-url selector-missing` includes the target, mode, and page as
+query parameters so it can be reproduced without the preset name.
 
 To fetch all ten pages directly from the API, use either loop below.
 
@@ -430,6 +452,10 @@ also accepts `page` from 1 through 20.
 | `delay_ms` | `1500` | Delay per API request in `slow` (0-30000 ms) |
 | `fail_page` | `3` | Permanently failing page in `resume` (1-20) |
 | `protected` | `false` | Require the demo login before serving `/catalog` |
+| `selector_failure_target` | — | Locator target for `selector-failure`: `login_button`, `item`, or `next_page` |
+| `selector_failure_mode` | — | Locator failure: `missing`, `changed`, `multiple`, `delayed`, `hidden`, or `disabled` |
+| `selector_failure_page` | `1` | Catalog page where the failure is injected (1-20) |
+| `selector_failure_delay_ms` | `500` | Delayed locator appearance in `selector-failure` (1-5000 ms) |
 
 The same `run_id`, scenario, and page share an attempt counter. Call
 `POST /admin/reset` or choose a fresh `run_id` when a test needs clean state.

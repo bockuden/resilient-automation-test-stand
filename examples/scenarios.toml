@@ -28,3 +28,11 @@ protected = true
 total_pages = 10
 fail_for = 2
 failure_delay_ms = 1500
+
+[presets.selector-missing]
+scenario = "selector-failure"
+
+[presets.selector-missing.selector_failure]
+target = "next_page"
+mode = "missing"
+page = 2

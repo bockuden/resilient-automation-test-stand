@@ -45,7 +45,7 @@ except that `protected` exists only on `/catalog`; `page` exists only on
 | Parameter | Default | Valid values | Meaning |
 | --- | --- | --- | --- |
 | `page` | `1` | integer `1..20` | API page to fetch. |
-| `scenario` | `success` | `success`, `transient`, `permanent`, `slow`, `resume`, `dom-change`, `duplicates` | Deterministic behavior. |
+| `scenario` | `success` | `success`, `transient`, `permanent`, `slow`, `resume`, `dom-change`, `duplicates`, `selector-failure` | Deterministic behavior. |
 | `run_id` | `manual` | any string | Opaque identifier that isolates counters by `(run_id, scenario, page)`. |
 | `total_pages` | `4` | integer `1..20` | Number of catalog pages exposed. |
 | `fail_for` | `2` | integer `0..10` | Initial `503` responses per page in `transient`. |
@@ -53,6 +53,10 @@ except that `protected` exists only on `/catalog`; `page` exists only on
 | `delay_ms` | `1500` | integer `0..30000` | Delay per API response in `slow`. |
 | `fail_page` | `3` | integer `1..20` | Permanently failing page in `resume`. |
 | `protected` | `false` | boolean | Require demo login for `/catalog`; it does not protect `/api/catalog`. |
+| `selector_failure_target` | unset | `login_button`, `item`, `next_page` | Browser locator affected by `selector-failure`. |
+| `selector_failure_mode` | unset | `missing`, `changed`, `multiple`, `delayed`, `hidden`, `disabled` | Deterministic locator failure behavior; must be paired with a target. |
+| `selector_failure_page` | `1` | integer `1..20` | Page where the locator failure applies. |
+| `selector_failure_delay_ms` | `500` | integer `1..5000` | Bounded visibility delay for the `delayed` mode. |
 
 An active TOML preset provides defaults. A query parameter overrides only its
 matching preset field. With no active preset, the defaults above apply.
@@ -72,6 +76,10 @@ empty.
 - `duplicates` repeats the previous page's final ID as the next page's first ID.
 - `dom-change` preserves `data-testid` locators while changing CSS classes and
   element nesting.
+- `selector-failure` returns normal catalog API data and applies the configured
+  locator failure only to its target and page in the browser UI. Presets use
+  `[presets.NAME.selector_failure]` with `target`, `mode`, and optional `page` /
+  `delay_ms`; `login_button` applies only to page 1.
 - Invalid constrained values return FastAPI's standard `422` validation body.
 
 Scenario failures expose `detail.code` as one of
@@ -81,7 +89,8 @@ error wording.
 
 ### Browser and demo-login contract
 
-The browser catalog keeps these locators stable through 1.x:
+The browser catalog keeps these locators stable through 1.x unless the
+`selector-failure` scenario explicitly changes the configured target:
 `catalog`, `catalog-item`, `item-name`, `item-price`, `next-page`, and
 `catalog-error` (each used as a `data-testid`). The `dom-change` scenario makes
 CSS classes and nesting deliberately unstable; consumers should use these
@@ -90,7 +99,9 @@ locators, roles, and labels instead.
 Protected scenarios accept only the public test credentials `demo` /
 `automation`. A successful login sets `demo_session=authenticated` with
 `HttpOnly` and `SameSite=Lax`, then redirects only to a local path. Invalid
-credentials return `401`; they must never be reused outside this stand.
+credentials return `401`; they must never be reused outside this stand. A
+protected `selector-failure` preset carries its target and mode through `/login`
+so the `login_button` target is exercised before authentication.
 
 ## Stable CLI contract
 
@@ -107,7 +118,8 @@ credentials return `401`; they must never be reused outside this stand.
 
 `--preset`, `--list-presets`, and `--print-url` are mutually exclusive. Invalid
 or unknown presets and missing config produce actionable argparse errors. Preset
-files accept only documented `ScenarioDefaults` fields and reject unknown fields.
+files accept documented `ScenarioDefaults` fields, including the optional
+nested `selector_failure` table, and reject unknown fields.
 
 ## Contract verification
 
