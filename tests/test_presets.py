@@ -102,6 +102,24 @@ page = {page}
     assert failure == SelectorFailureConfig(target=target, mode=mode, page=page)
 
 
+def test_rate_limit_preset_loads_bounded_defaults(tmp_path: Path) -> None:
+    path = write_config(
+        tmp_path / "rate-limit.toml",
+        """
+[presets.rate-limited]
+scenario = "rate-limit"
+rate_limit_for = 3
+retry_after_seconds = 12
+""",
+    )
+
+    assert load_preset_document(path).presets["rate-limited"] == ScenarioDefaults(
+        scenario="rate-limit",
+        rate_limit_for=3,
+        retry_after_seconds=12,
+    )
+
+
 def test_custom_auth_credentials_load_from_toml(tmp_path: Path) -> None:
     path = write_config(
         tmp_path / "scenarios.toml",
@@ -230,6 +248,9 @@ password_env = "EMPTY_TEST_PASSWORD"
         '[presets.invalid.selector_failure]\ntarget = "item"\nmode = "random"\n',
         '[presets.invalid.selector_failure]\ntarget = "next_page"\nmode = "delayed"\ndelay_ms = 5001\n',
         '[presets.invalid.selector_failure]\ntarget = "login_button"\nmode = "hidden"\npage = 2\n',
+        "[presets.rate-limit]\nrate_limit_for = -1\n",
+        "[presets.rate-limit]\nrate_limit_for = 11\n",
+        "[presets.rate-limit]\nretry_after_seconds = 301\n",
         "presets = 'not a table'\n",
     ],
 )
@@ -289,3 +310,20 @@ def test_preset_url_flattens_selector_failure_settings() -> None:
     assert query["selector_failure_mode"] == ["missing"]
     assert query["selector_failure_page"] == ["2"]
     assert query["selector_failure_delay_ms"] == ["500"]
+
+
+def test_rate_limit_preset_url_contains_overridable_rate_limit_values() -> None:
+    url = preset_url(
+        "rate-limited",
+        ScenarioDefaults(
+            scenario="rate-limit",
+            rate_limit_for=3,
+            retry_after_seconds=12,
+        ),
+        "http://localhost:8080/catalog",
+    )
+
+    query = parse_qs(urlsplit(url).query)
+    assert query["scenario"] == ["rate-limit"]
+    assert query["rate_limit_for"] == ["3"]
+    assert query["retry_after_seconds"] == ["12"]
