@@ -69,6 +69,7 @@ across an ordered sequence of requests.
 | --- | --- | --- |
 | `success` | Every in-range page returns five stable items and `200`. | It can complete the baseline paginated workflow. |
 | `transient` | The first `fail_for` requests per page return `503` with `Retry-After: 1`, then `200`. | It honors the delay, caps its retry budget, and eventually succeeds. |
+| `rate-limit` | The first `rate_limit_for` requests per page return `429` with the configured `Retry-After`, then `200`. | It distinguishes rate limiting from transient server errors and resumes after the indicated delay. |
 | `permanent` | Every catalog API request returns `500`. | It stops retrying and reports a terminal failure instead of looping forever. |
 | `slow` | Each API response waits for `delay_ms`, then returns the normal page. | Its timeout and cancellation policies end the operation cleanly. |
 | `resume` | Only `fail_page` returns `500`; the other pages remain available. | It persists a checkpoint and resumes without reprocessing completed pages. |
@@ -350,7 +351,7 @@ transient recovery, login, DOM changes, duplicates, resume, and cancellation.
 For repeated scenarios, the same values can be stored in a TOML file instead
 of copied into every startup command. The repository includes
 [`examples/scenarios.toml`](https://github.com/bockuden/resilient-automation-test-stand/blob/main/examples/scenarios.toml) with the three cookbook
-scenarios above and a selector-failure preset.
+scenarios above, a selector-failure preset, and a rate-limited preset.
 
 These CLI commands are identical in PowerShell, Linux, and macOS shells:
 
@@ -382,6 +383,19 @@ total_pages = 10
 fail_for = 2
 failure_delay_ms = 1500
 ```
+
+The rate-limit scenario returns `429` twice by default, then serves the normal
+catalog response. Configure the number of failures and exact retry header in a
+preset:
+
+```toml
+[presets.rate-limited]
+scenario = "rate-limit"
+rate_limit_for = 2
+retry_after_seconds = 1
+```
+
+The counter is isolated by `run_id` and page; `POST /admin/reset` clears it.
 
 To simulate a missing next-page locator on page 2, add a selector failure to a
 preset. Supported targets are `login_button`, `item`, and `next_page`; modes
@@ -449,6 +463,8 @@ also accepts `page` from 1 through 20.
 | `total_pages` | `4` | Number of catalog pages to expose (1-20) |
 | `fail_for` | `2` | Initial `503` responses per page in `transient` (0-10) |
 | `failure_delay_ms` | `0` | Delay before each transient `503` response (0-30000 ms) |
+| `rate_limit_for` | `2` | Initial `429` responses per page in `rate-limit` (0-10) |
+| `retry_after_seconds` | `1` | `Retry-After` header value in `rate-limit` (0-300 seconds) |
 | `delay_ms` | `1500` | Delay per API request in `slow` (0-30000 ms) |
 | `fail_page` | `3` | Permanently failing page in `resume` (1-20) |
 | `protected` | `false` | Require the demo login before serving `/catalog` |

@@ -4,6 +4,8 @@
 
 ### Added
 
+- Added a deterministic `rate-limit` API scenario with configurable `429`
+  attempts and an exact `Retry-After` header value.
 - Added deterministic browser selector failure scenarios for missing, changed,
   multiple, delayed, hidden, and disabled locators scoped to a target and page.
 - Added configurable stable `data-testid` tokens for login and catalog elements,

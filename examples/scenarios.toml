@@ -36,3 +36,8 @@ scenario = "selector-failure"
 target = "next_page"
 mode = "missing"
 page = 2
+
+[presets.rate-limited]
+scenario = "rate-limit"
+rate_limit_for = 2
+retry_after_seconds = 1
