@@ -78,6 +78,116 @@ async def test_transient_scenario_fails_twice_then_recovers(client: AsyncClient)
 
 
 @pytest.mark.anyio
+async def test_rate_limit_scenario_returns_exactly_n_429s_then_recovers(
+    client: AsyncClient,
+) -> None:
+    url = (
+        "/api/catalog?scenario=rate-limit&run_id=rate-limit-retry&page=1"
+        "&rate_limit_for=2&retry_after_seconds=7"
+    )
+
+    first = await client.get(url)
+    second = await client.get(url)
+    recovered = await client.get(url)
+
+    assert first.status_code == second.status_code == 429
+    assert first.headers["retry-after"] == second.headers["retry-after"] == "7"
+    assert first.json()["detail"] == {"code": "RATE_LIMITED", "attempt": 1}
+    assert second.json()["detail"] == {"code": "RATE_LIMITED", "attempt": 2}
+    assert recovered.status_code == 200
+    assert recovered.json()["attempt"] == 3
+
+
+@pytest.mark.anyio
+async def test_rate_limit_counters_are_isolated_by_run_id(client: AsyncClient) -> None:
+    first_run = await client.get("/api/catalog?scenario=rate-limit&run_id=first&page=1")
+    first_run_recovered = await client.get("/api/catalog?scenario=rate-limit&run_id=first&page=1")
+    second_run = await client.get("/api/catalog?scenario=rate-limit&run_id=second&page=1")
+
+    assert first_run.status_code == second_run.status_code == 429
+    assert first_run_recovered.status_code == 429
+    assert first_run.json()["detail"]["attempt"] == 1
+    assert first_run_recovered.json()["detail"]["attempt"] == 2
+    assert second_run.json()["detail"]["attempt"] == 1
+
+
+@pytest.mark.anyio
+async def test_rate_limit_query_overrides_preset_defaults(client: AsyncClient) -> None:
+    configure_scenario_defaults(
+        ScenarioDefaults(scenario="rate-limit", rate_limit_for=3, retry_after_seconds=15)
+    )
+    url = "/api/catalog?run_id=rate-limit-overrides&rate_limit_for=1&retry_after_seconds=9"
+
+    limited = await client.get(url)
+    recovered = await client.get(url)
+
+    assert limited.status_code == 429
+    assert limited.headers["retry-after"] == "9"
+    assert recovered.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_admin_reset_restarts_rate_limit_counter(client: AsyncClient) -> None:
+    url = "/api/catalog?scenario=rate-limit&run_id=rate-limit-reset&page=1&rate_limit_for=1"
+    assert (await client.get(url)).status_code == 429
+
+    reset = await client.post("/admin/reset")
+    first_after_reset = await client.get(url)
+
+    assert reset.json() == {"clearedCounters": 1}
+    assert first_after_reset.status_code == 429
+    assert first_after_reset.json()["detail"]["attempt"] == 1
+
+
+@pytest.mark.anyio
+async def test_rate_limit_query_rejects_out_of_range_values(client: AsyncClient) -> None:
+    too_many_failures = await client.get("/api/catalog?scenario=rate-limit&rate_limit_for=11")
+    too_long_retry_after = await client.get(
+        "/api/catalog?scenario=rate-limit&retry_after_seconds=301"
+    )
+
+    assert too_many_failures.status_code == 422
+    assert too_long_retry_after.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_catalog_shell_passes_rate_limit_defaults_to_browser_runtime(
+    client: AsyncClient,
+) -> None:
+    configure_scenario_defaults(
+        ScenarioDefaults(scenario="rate-limit", rate_limit_for=4, retry_after_seconds=9)
+    )
+
+    shell = await client.get("/catalog?run_id=browser-rate-limit")
+    script = await client.get("/static/catalog.js")
+
+    assert '"rateLimitFor": 4' in shell.text
+    assert '"retryAfterSeconds": 9' in shell.text
+    assert "rate_limit_for: config.rateLimitFor" in script.text
+    assert "retry_after_seconds: config.retryAfterSeconds" in script.text
+
+
+@pytest.mark.anyio
+async def test_protected_rate_limit_settings_survive_login_redirect(client: AsyncClient) -> None:
+    configure_scenario_defaults(
+        ScenarioDefaults(
+            scenario="rate-limit",
+            protected=True,
+            rate_limit_for=3,
+            retry_after_seconds=8,
+        )
+    )
+
+    response = await client.get("/catalog?run_id=protected-rate-limit", follow_redirects=False)
+    next_url = parse_qs(urlsplit(response.headers["location"]).query)["next_url"][0]
+
+    assert response.status_code == 303
+    assert "scenario=rate-limit" in next_url
+    assert "rate_limit_for=3" in next_url
+    assert "retry_after_seconds=8" in next_url
+
+
+@pytest.mark.anyio
 async def test_run_id_isolates_transient_attempt_counters(client: AsyncClient) -> None:
     first_run = await client.get("/api/catalog?scenario=transient&run_id=first&page=1&fail_for=1")
     second_run = await client.get("/api/catalog?scenario=transient&run_id=second&page=1&fail_for=1")
@@ -133,6 +243,8 @@ def test_openapi_preserves_catalog_query_parameter_contract() -> None:
         "selector_failure_mode",
         "selector_failure_page",
         "selector_failure_delay_ms",
+        "rate_limit_for",
+        "retry_after_seconds",
     }
     assert set(catalog_parameters) == common_parameters | {"protected"}
     assert set(api_parameters) == common_parameters | {"page"}

@@ -45,11 +45,13 @@ except that `protected` exists only on `/catalog`; `page` exists only on
 | Parameter | Default | Valid values | Meaning |
 | --- | --- | --- | --- |
 | `page` | `1` | integer `1..20` | API page to fetch. |
-| `scenario` | `success` | `success`, `transient`, `permanent`, `slow`, `resume`, `dom-change`, `duplicates`, `selector-failure` | Deterministic behavior. |
+| `scenario` | `success` | `success`, `transient`, `rate-limit`, `permanent`, `slow`, `resume`, `dom-change`, `duplicates`, `selector-failure` | Deterministic behavior. |
 | `run_id` | `manual` | any string | Opaque identifier that isolates counters by `(run_id, scenario, page)`. |
 | `total_pages` | `4` | integer `1..20` | Number of catalog pages exposed. |
 | `fail_for` | `2` | integer `0..10` | Initial `503` responses per page in `transient`. |
 | `failure_delay_ms` | `0` | integer `0..30000` | Delay before each transient `503`. |
+| `rate_limit_for` | `2` | integer `0..10` | Initial `429` responses per page in `rate-limit`. |
+| `retry_after_seconds` | `1` | integer `0..300` | `Retry-After` delta-seconds value in `rate-limit`. |
 | `delay_ms` | `1500` | integer `0..30000` | Delay per API response in `slow`. |
 | `fail_page` | `3` | integer `1..20` | Permanently failing page in `resume`. |
 | `protected` | `false` | boolean | Require demo login for `/catalog`; it does not protect `/api/catalog`. |
@@ -70,6 +72,9 @@ empty.
 
 - `transient` returns `503` with `Retry-After: 1` for the first `fail_for`
   attempts for each `(run_id, scenario, page)`, then returns `200`.
+- `rate-limit` returns `429` with the configured `Retry-After` value for the
+  first `rate_limit_for` attempts for each `(run_id, scenario, page)`, then
+  returns `200`.
 - `permanent` returns `500` on every attempt.
 - `resume` returns `500` only for `fail_page`; other pages continue to work.
 - `slow` delays the response before returning the normal page.

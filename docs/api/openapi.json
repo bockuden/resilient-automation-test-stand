@@ -80,7 +80,8 @@
               "resume",
               "dom-change",
               "duplicates",
-              "selector-failure"
+              "selector-failure",
+              "rate-limit"
             ],
             "title": "Scenario",
             "type": "string"
@@ -187,7 +188,7 @@
     },
     "/api/catalog": {
       "get": {
-        "description": "Returns deterministic catalog data for retry, pagination, duplicate, delay, and checkpoint-recovery tests.",
+        "description": "Returns deterministic catalog data for retry, pagination, duplicate, rate-limit, delay, and checkpoint-recovery tests.",
         "operationId": "get_catalog_page",
         "parameters": [
           {
@@ -206,7 +207,8 @@
                     "resume",
                     "dom-change",
                     "duplicates",
-                    "selector-failure"
+                    "selector-failure",
+                    "rate-limit"
                   ],
                   "type": "string"
                 },
@@ -328,6 +330,46 @@
               ],
               "description": "Number of pages exposed by the catalog.",
               "title": "Total Pages"
+            }
+          },
+          {
+            "description": "Initial HTTP 429 responses per page in the rate-limit scenario.",
+            "in": "query",
+            "name": "rate_limit_for",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 10,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Initial HTTP 429 responses per page in the rate-limit scenario.",
+              "title": "Rate Limit For"
+            }
+          },
+          {
+            "description": "Retry-After value for rate-limit responses, in seconds.",
+            "in": "query",
+            "name": "retry_after_seconds",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 300,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Retry-After value for rate-limit responses, in seconds.",
+              "title": "Retry After Seconds"
             }
           },
           {
@@ -455,6 +497,9 @@
             },
             "description": "Validation Error"
           },
+          "429": {
+            "description": "Rate-limit scenario response; includes the Retry-After header."
+          },
           "500": {
             "description": "Permanent or checkpoint-resume scenario failure."
           },
@@ -486,7 +531,8 @@
                     "resume",
                     "dom-change",
                     "duplicates",
-                    "selector-failure"
+                    "selector-failure",
+                    "rate-limit"
                   ],
                   "type": "string"
                 },
@@ -608,6 +654,46 @@
               ],
               "description": "Number of pages exposed by the catalog.",
               "title": "Total Pages"
+            }
+          },
+          {
+            "description": "Initial HTTP 429 responses per page in the rate-limit scenario.",
+            "in": "query",
+            "name": "rate_limit_for",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 10,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Initial HTTP 429 responses per page in the rate-limit scenario.",
+              "title": "Rate Limit For"
+            }
+          },
+          {
+            "description": "Retry-After value for rate-limit responses, in seconds.",
+            "in": "query",
+            "name": "retry_after_seconds",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 300,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Retry-After value for rate-limit responses, in seconds.",
+              "title": "Retry After Seconds"
             }
           },
           {

@@ -145,6 +145,18 @@ class CatalogQuery(BaseModel):
         le=20,
         description="Number of pages exposed by the catalog.",
     )
+    rate_limit_for: int | None = Field(
+        default=None,
+        ge=0,
+        le=10,
+        description="Initial HTTP 429 responses per page in the rate-limit scenario.",
+    )
+    retry_after_seconds: int | None = Field(
+        default=None,
+        ge=0,
+        le=300,
+        description="Retry-After value for rate-limit responses, in seconds.",
+    )
     selector_failure_target: SelectorFailureTarget | None = Field(
         default=None,
         description="Browser locator target for the selector-failure scenario.",
@@ -384,6 +396,8 @@ async def catalog(
                 "failure_delay_ms": defaults.failure_delay_ms,
                 "fail_page": defaults.fail_page,
                 "total_pages": defaults.total_pages,
+                "rate_limit_for": defaults.rate_limit_for,
+                "retry_after_seconds": defaults.retry_after_seconds,
                 "protected": "true",
                 **failure_query,
             }
@@ -399,6 +413,8 @@ async def catalog(
         "failureDelayMs": defaults.failure_delay_ms,
         "failPage": defaults.fail_page,
         "totalPages": defaults.total_pages,
+        "rateLimitFor": defaults.rate_limit_for,
+        "retryAfterSeconds": defaults.retry_after_seconds,
         "selectors": app.state.selectors.model_dump(),
         "selectorFailure": _runtime_selector_failure(defaults),
     }
@@ -411,12 +427,13 @@ async def catalog(
     operation_id="get_catalog_page",
     summary="Fetch one deterministic catalog page",
     description=(
-        "Returns deterministic catalog data for retry, pagination, duplicate, delay, "
+        "Returns deterministic catalog data for retry, pagination, duplicate, rate-limit, delay, "
         "and checkpoint-recovery tests."
     ),
     responses={
         500: {"description": "Permanent or checkpoint-resume scenario failure."},
         503: {"description": "Transient scenario failure; includes the Retry-After header."},
+        429: {"description": "Rate-limit scenario response; includes the Retry-After header."},
     },
 )
 async def catalog_api(
@@ -434,6 +451,13 @@ async def catalog_api(
             status_code=503,
             detail={"code": "TRANSIENT_CATALOG_FAILURE", "attempt": attempt},
             headers={"Retry-After": "1"},
+        )
+
+    if defaults.scenario == "rate-limit" and attempt <= defaults.rate_limit_for:
+        raise HTTPException(
+            status_code=429,
+            detail={"code": "RATE_LIMITED", "attempt": attempt},
+            headers={"Retry-After": str(defaults.retry_after_seconds)},
         )
 
     if defaults.scenario == "permanent":
