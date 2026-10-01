@@ -29,6 +29,7 @@ Scenario = Literal[
     "dom-change",
     "duplicates",
     "selector-failure",
+    "rate-limit",
 ]
 
 SelectorFailureTarget = Literal["login_button", "item", "next_page"]
@@ -64,6 +65,8 @@ class ScenarioDefaults(BaseModel):
     failure_delay_ms: int = Field(default=0, ge=0, le=30_000)
     delay_ms: int = Field(default=1500, ge=0, le=30_000)
     fail_page: int = Field(default=3, ge=1, le=20)
+    rate_limit_for: int = Field(default=2, ge=0, le=10)
+    retry_after_seconds: int = Field(default=1, ge=0, le=300)
     selector_failure: SelectorFailureConfig | None = None
 
 

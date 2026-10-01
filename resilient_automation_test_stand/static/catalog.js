@@ -44,6 +44,8 @@ async function loadPage(page) {
     failure_delay_ms: config.failureDelayMs,
     fail_page: config.failPage,
     total_pages: config.totalPages,
+    rate_limit_for: config.rateLimitFor,
+    retry_after_seconds: config.retryAfterSeconds,
   });
 
   try {
