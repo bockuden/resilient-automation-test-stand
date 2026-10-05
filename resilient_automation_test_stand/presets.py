@@ -76,6 +76,7 @@ class ScenarioDefaults(BaseModel):
     rate_limit_for: int = Field(default=2, ge=0, le=10)
     retry_after_seconds: int = Field(default=1, ge=0, le=300)
     malformed_mode: MalformedMode = "invalid_json"
+    expire_session_after_page: int | None = Field(default=None, ge=1, le=20)
     selector_failure: SelectorFailureConfig | None = None
 
 

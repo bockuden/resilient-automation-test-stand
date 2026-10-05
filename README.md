@@ -78,6 +78,7 @@ across an ordered sequence of requests.
 | `selector-failure` | One configured browser locator is missing, changed, duplicated, delayed, hidden, or disabled on a selected page. | It retries locator strategies and applies a fallback only when the target is unavailable. |
 | `malformed-api` | The API returns one selected deterministic contract violation: invalid JSON, truncated JSON, a wrong content type, missing fields, or a wrong field type. | It rejects or safely handles broken upstream responses without silently accepting corrupt data. |
 | `protected=true` | The browser route redirects through the configured login and back to the original catalog URL. | It preserves the session cookie and return URL. |
+| `expire_session_after_page=N` | A protected session expires before page `N + 1`; re-login returns to the interrupted page. | It detects expiry, authenticates again, and continues without restarting the workflow. |
 
 ## Where WireMock and Toxiproxy fit
 
@@ -352,7 +353,8 @@ transient recovery, login, DOM changes, duplicates, resume, and cancellation.
 For repeated scenarios, the same values can be stored in a TOML file instead
 of copied into every startup command. The repository includes
 [`examples/scenarios.toml`](https://github.com/bockuden/resilient-automation-test-stand/blob/main/examples/scenarios.toml) with the three cookbook
-scenarios above, selector-failure and rate-limit presets, and a malformed JSON preset.
+scenarios above, selector-failure and rate-limit presets, a malformed JSON
+preset, and a deterministic session-expiry preset.
 
 These CLI commands are identical in PowerShell, Linux, and macOS shells:
 
@@ -414,6 +416,22 @@ These responses deliberately violate the normal OpenAPI `CatalogPage` response
 contract. They still return status `200`, allowing a client to distinguish
 payload and media-type validation failures from HTTP status failures.
 
+To test authentication expiring during pagination, set a page boundary together
+with `protected = true`. With a boundary of `2`, pages 1 and 2 work, page 3
+returns `401 SESSION_EXPIRED`, and the browser redirects to login. Successful
+re-login restores access for that `run_id` and resumes page 3. The boundary is
+request based and never depends on wall-clock time.
+
+```toml
+[presets.session-expiry]
+scenario = "success"
+protected = true
+expire_session_after_page = 2
+```
+
+Session-expiry state is isolated by `run_id`. `POST /admin/reset` clears it so
+the same configuration and request sequence replay from a clean state.
+
 To simulate a missing next-page locator on page 2, add a selector failure to a
 preset. Supported targets are `login_button`, `item`, and `next_page`; modes
 are `missing`, `changed`, `multiple`, `delayed`, `hidden`, and `disabled`.
@@ -470,8 +488,9 @@ done
 
 ## Scenario parameters
 
-Both `/catalog` and `/api/catalog` accept the parameters below. `/api/catalog`
-also accepts `page` from 1 through 20.
+Both `/catalog` and `/api/catalog` accept the common parameters below.
+`/catalog` additionally accepts `resume_page`; `/api/catalog` accepts `page`,
+both from 1 through 20.
 
 | Parameter | Built-in default | Meaning |
 | --- | --- | --- |
@@ -483,9 +502,11 @@ also accepts `page` from 1 through 20.
 | `rate_limit_for` | `2` | Initial `429` responses per page in `rate-limit` (0-10) |
 | `retry_after_seconds` | `1` | `Retry-After` header value in `rate-limit` (0-300 seconds) |
 | `malformed_mode` | `invalid_json` | Broken response emitted by `malformed-api`: `invalid_json`, `truncated_json`, `wrong_content_type`, `missing_fields`, or `wrong_field_type` |
+| `expire_session_after_page` | — | Expire an authenticated session before the following page (1-20); implies protected browser flow |
 | `delay_ms` | `1500` | Delay per API request in `slow` (0-30000 ms) |
 | `fail_page` | `3` | Permanently failing page in `resume` (1-20) |
-| `protected` | `false` | Require the demo login before serving `/catalog` |
+| `protected` | `false` | Require the demo login for `/catalog` and its authenticated cookie for `/api/catalog` |
+| `resume_page` | `1` | Browser page loaded after login or re-login; `/catalog` only (1-20) |
 | `selector_failure_target` | — | Locator target for `selector-failure`: `login_button`, `item`, or `next_page` |
 | `selector_failure_mode` | — | Locator failure: `missing`, `changed`, `multiple`, `delayed`, `hidden`, or `disabled` |
 | `selector_failure_page` | `1` | Catalog page where the failure is injected (1-20) |

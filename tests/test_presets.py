@@ -146,6 +146,24 @@ malformed_mode = "{mode}"
     )
 
 
+def test_session_expiry_preset_loads_deterministic_page_boundary(tmp_path: Path) -> None:
+    path = write_config(
+        tmp_path / "session-expiry.toml",
+        """
+[presets.session-expiry]
+scenario = "success"
+protected = true
+expire_session_after_page = 2
+""",
+    )
+
+    assert load_preset_document(path).presets["session-expiry"] == ScenarioDefaults(
+        scenario="success",
+        protected=True,
+        expire_session_after_page=2,
+    )
+
+
 def test_custom_auth_credentials_load_from_toml(tmp_path: Path) -> None:
     path = write_config(
         tmp_path / "scenarios.toml",
@@ -278,6 +296,8 @@ password_env = "EMPTY_TEST_PASSWORD"
         "[presets.rate-limit]\nrate_limit_for = 11\n",
         "[presets.rate-limit]\nretry_after_seconds = 301\n",
         '[presets.malformed]\nscenario = "malformed-api"\nmalformed_mode = "random"\n',
+        "[presets.session-expiry]\nexpire_session_after_page = 0\n",
+        "[presets.session-expiry]\nexpire_session_after_page = 21\n",
         "presets = 'not a table'\n",
     ],
 )

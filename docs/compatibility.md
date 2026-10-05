@@ -29,17 +29,17 @@ are test-only features, not production authentication or persistence features.
 | --- | --- |
 | `GET /health` | Returns `{"status": "ok"}` when the process is ready. |
 | `GET /catalog` | Returns the JavaScript catalog shell; a protected request redirects with `303` to `/login`. |
-| `GET /api/catalog` | Returns one deterministic `CatalogPage` JSON response or the documented scenario failure. |
+| `GET /api/catalog` | Returns one deterministic `CatalogPage` JSON response or a documented authentication/scenario failure. |
 | `GET /login` | Returns the fixed demo login form. |
 | `POST /login` | Accepts form data, sets the demo session cookie on success, then redirects with `303` to a local catalog URL. |
-| `POST /admin/reset` | Test-only: clears in-memory attempt counters and returns `clearedCounters`. |
+| `POST /admin/reset` | Test-only: clears attempt counters and session-expiry state, then returns `clearedCounters`. |
 
 `/api-docs` is the stable interactive presentation of the OpenAPI contract.
 
 ### Catalog query parameters
 
-`GET /catalog` and `GET /api/catalog` accept the same scenario parameters,
-except that `protected` exists only on `/catalog`; `page` exists only on
+`GET /catalog` and `GET /api/catalog` accept the same scenario and session
+parameters. `resume_page` exists only on `/catalog`; `page` exists only on
 `/api/catalog`.
 
 | Parameter | Default | Valid values | Meaning |
@@ -53,9 +53,11 @@ except that `protected` exists only on `/catalog`; `page` exists only on
 | `rate_limit_for` | `2` | integer `0..10` | Initial `429` responses per page in `rate-limit`. |
 | `retry_after_seconds` | `1` | integer `0..300` | `Retry-After` delta-seconds value in `rate-limit`. |
 | `malformed_mode` | `invalid_json` | `invalid_json`, `truncated_json`, `wrong_content_type`, `missing_fields`, `wrong_field_type` | Deterministic contract violation emitted by `malformed-api`. |
+| `expire_session_after_page` | unset | integer `1..20` | Expire an authenticated session before the following page. |
 | `delay_ms` | `1500` | integer `0..30000` | Delay per API response in `slow`. |
 | `fail_page` | `3` | integer `1..20` | Permanently failing page in `resume`. |
-| `protected` | `false` | boolean | Require demo login for `/catalog`; it does not protect `/api/catalog`. |
+| `protected` | `false` | boolean | Require demo login for `/catalog` and its authenticated cookie for `/api/catalog`. |
+| `resume_page` | `1` | integer `1..20` | Browser page loaded after login or re-login; `/catalog` only. |
 | `selector_failure_target` | unset | `login_button`, `item`, `next_page` | Browser locator affected by `selector-failure`. |
 | `selector_failure_mode` | unset | `missing`, `changed`, `multiple`, `delayed`, `hidden`, `disabled` | Deterministic locator failure behavior; must be paired with a target. |
 | `selector_failure_page` | `1` | integer `1..20` | Page where the locator failure applies. |
@@ -92,6 +94,13 @@ empty.
   `wrong_content_type` returns a normal JSON page as `text/plain`,
   `missing_fields` omits `items`, and `wrong_field_type` returns `items` as a
   string. Payload construction and truncation points are deterministic.
+- `protected=true` on an API request requires the `demo_session` cookie and
+  returns `401` with `AUTHENTICATION_REQUIRED` when it is absent.
+- `expire_session_after_page=N` implies a protected browser flow. Pages through
+  `N` succeed; the first later page expires the session for that `run_id` and
+  boundary. API requests then return `401 SESSION_EXPIRED` until valid re-login.
+  The browser preserves all scenario parameters and resumes the interrupted
+  page. Different `run_id` values remain isolated.
 - Invalid constrained values return FastAPI's standard `422` validation body.
 
 Scenario failures expose `detail.code` as one of
@@ -108,12 +117,14 @@ The browser catalog keeps these locators stable through 1.x unless the
 CSS classes and nesting deliberately unstable; consumers should use these
 locators, roles, and labels instead.
 
-Protected scenarios accept only the public test credentials `demo` /
-`automation`. A successful login sets `demo_session=authenticated` with
+Protected scenarios accept the configured test credentials, whose defaults are
+`demo` / `automation`. A successful login sets `demo_session=authenticated` with
 `HttpOnly` and `SameSite=Lax`, then redirects only to a local path. Invalid
 credentials return `401`; they must never be reused outside this stand. A
 protected `selector-failure` preset carries its target and mode through `/login`
-so the `login_button` target is exercised before authentication.
+so the `login_button` target is exercised before authentication. A successful
+re-login clears an expired state only for the `run_id` and boundary encoded in
+the local return URL. `POST /admin/reset` clears all expiry state.
 
 ## Stable CLI contract
 
@@ -130,8 +141,9 @@ so the `login_button` target is exercised before authentication.
 
 `--preset`, `--list-presets`, and `--print-url` are mutually exclusive. Invalid
 or unknown presets and missing config produce actionable argparse errors. Preset
-files accept documented `ScenarioDefaults` fields, including `malformed_mode`
-and the optional nested `selector_failure` table, and reject unknown fields.
+files accept documented `ScenarioDefaults` fields, including `malformed_mode`,
+`expire_session_after_page`, and the optional nested `selector_failure` table,
+and reject unknown fields.
 
 ## Contract verification
 

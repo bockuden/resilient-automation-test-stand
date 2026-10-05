@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
@@ -75,6 +76,181 @@ async def test_transient_scenario_fails_twice_then_recovers(client: AsyncClient)
     recovered = await client.get(url)
     assert recovered.status_code == 200
     assert recovered.json()["attempt"] == 3
+
+
+@pytest.mark.anyio
+async def test_protected_api_requires_and_accepts_an_ordinary_session(
+    client: AsyncClient,
+) -> None:
+    unauthenticated = await client.get("/api/catalog?protected=true&run_id=ordinary-session")
+    login = await client.post(
+        "/login",
+        data={
+            "username": "demo",
+            "password": "automation",
+            "next_url": "/catalog?protected=true&run_id=ordinary-session",
+        },
+        follow_redirects=False,
+    )
+    authenticated = await client.get("/api/catalog?protected=true&run_id=ordinary-session")
+
+    assert unauthenticated.status_code == 401
+    assert unauthenticated.json()["detail"] == {"code": "AUTHENTICATION_REQUIRED"}
+    assert login.status_code == 303
+    assert authenticated.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_session_expires_after_exact_configured_page(client: AsyncClient) -> None:
+    base = (
+        "/api/catalog?scenario=success&protected=true&run_id=expiry-boundary"
+        "&expire_session_after_page=2"
+    )
+    await client.post(
+        "/login",
+        data={
+            "username": "demo",
+            "password": "automation",
+            "next_url": (
+                "/catalog?scenario=success&protected=true&run_id=expiry-boundary"
+                "&expire_session_after_page=2"
+            ),
+        },
+    )
+
+    page_one = await client.get(f"{base}&page=1")
+    page_two = await client.get(f"{base}&page=2")
+    page_three = await client.get(f"{base}&page=3")
+    page_one_after_expiry = await client.get(f"{base}&page=1")
+
+    assert page_one.status_code == page_two.status_code == 200
+    assert page_three.status_code == page_one_after_expiry.status_code == 401
+    assert page_three.json()["detail"] == {
+        "code": "SESSION_EXPIRED",
+        "expired_after_page": 2,
+    }
+
+
+@pytest.mark.anyio
+async def test_custom_credentials_restore_access_after_relogin(client: AsyncClient) -> None:
+    configure_auth(ResolvedAuth(username="session-user", password="session-password"))
+    next_url = (
+        "/catalog?scenario=success&protected=true&run_id=custom-relogin"
+        "&expire_session_after_page=1&resume_page=2"
+    )
+    api_url = (
+        "/api/catalog?scenario=success&protected=true&run_id=custom-relogin"
+        "&expire_session_after_page=1&page=2"
+    )
+    credentials = {
+        "username": "session-user",
+        "password": "session-password",
+        "next_url": next_url,
+    }
+
+    await client.post("/login", data=credentials)
+    expired = await client.get(api_url)
+    relogin = await client.post("/login", data=credentials, follow_redirects=False)
+    restored = await client.get(api_url)
+
+    assert expired.status_code == 401
+    assert expired.json()["detail"]["code"] == "SESSION_EXPIRED"
+    assert relogin.status_code == 303
+    assert relogin.headers["location"] == next_url
+    assert restored.status_code == 200
+    assert restored.json()["page"] == 2
+
+
+@pytest.mark.anyio
+async def test_expired_session_state_is_isolated_by_run_id(client: AsyncClient) -> None:
+    await client.post(
+        "/login",
+        data={"username": "demo", "password": "automation", "next_url": "/catalog"},
+    )
+    first_run = "/api/catalog?protected=true&run_id=expired-run&expire_session_after_page=1&page=2"
+    second_run_page_one = (
+        "/api/catalog?protected=true&run_id=independent-run&expire_session_after_page=1&page=1"
+    )
+    second_run_page_two = second_run_page_one[:-1] + "2"
+
+    expired = await client.get(first_run)
+    independent = await client.get(second_run_page_one)
+    independent_expired = await client.get(second_run_page_two)
+
+    assert expired.status_code == 401
+    assert independent.status_code == 200
+    assert independent_expired.status_code == 401
+
+
+@pytest.mark.anyio
+async def test_concurrent_expiry_requests_have_one_deterministic_result(
+    client: AsyncClient,
+) -> None:
+    await client.post(
+        "/login",
+        data={"username": "demo", "password": "automation", "next_url": "/catalog"},
+    )
+    url = "/api/catalog?protected=true&run_id=concurrent-expiry&expire_session_after_page=1&page=2"
+
+    responses = await asyncio.gather(client.get(url), client.get(url), client.get(url))
+
+    assert [response.status_code for response in responses] == [401, 401, 401]
+    assert {response.json()["detail"]["code"] for response in responses} == {"SESSION_EXPIRED"}
+
+
+@pytest.mark.anyio
+async def test_admin_reset_restores_clean_session_expiry_state(client: AsyncClient) -> None:
+    await client.post(
+        "/login",
+        data={"username": "demo", "password": "automation", "next_url": "/catalog"},
+    )
+    base = "/api/catalog?protected=true&run_id=reset-expiry&expire_session_after_page=2"
+    assert (await client.get(f"{base}&page=3")).status_code == 401
+
+    reset = await client.post("/admin/reset")
+    before_boundary = await client.get(f"{base}&page=2")
+    expired_again = await client.get(f"{base}&page=3")
+
+    assert reset.status_code == 200
+    assert before_boundary.status_code == 200
+    assert expired_again.status_code == 401
+
+
+@pytest.mark.anyio
+async def test_session_expiry_query_rejects_invalid_boundaries(client: AsyncClient) -> None:
+    below_range = await client.get("/catalog?expire_session_after_page=0")
+    above_range = await client.get("/api/catalog?expire_session_after_page=21")
+    invalid_resume = await client.get("/catalog?resume_page=0")
+
+    assert below_range.status_code == 422
+    assert above_range.status_code == 422
+    assert invalid_resume.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_browser_runtime_redirects_and_resumes_expired_session(
+    client: AsyncClient,
+) -> None:
+    configure_scenario_defaults(
+        ScenarioDefaults(protected=True, expire_session_after_page=2, total_pages=4)
+    )
+    await client.post(
+        "/login",
+        data={"username": "demo", "password": "automation", "next_url": "/catalog"},
+    )
+
+    shell = await client.get("/catalog?run_id=browser-expiry&resume_page=3")
+    script = await client.get("/static/catalog.js")
+
+    assert shell.status_code == 200
+    assert '"protected": true' in shell.text
+    assert '"expireSessionAfterPage": 2' in shell.text
+    assert '"initialPage": 3' in shell.text
+    assert "failure.detail?.code === 'SESSION_EXPIRED'" in script.text
+    assert "returnUrl.searchParams.set('expire_session_after_page'" in script.text
+    assert "returnUrl.searchParams.set('resume_page', page)" in script.text
+    assert "window.location.assign(`/login?${loginQuery}`)" in script.text
+    assert "loadPage(config.initialPage)" in script.text
 
 
 @pytest.mark.anyio
@@ -371,8 +547,10 @@ def test_openapi_preserves_catalog_query_parameter_contract() -> None:
         "rate_limit_for",
         "retry_after_seconds",
         "malformed_mode",
+        "protected",
+        "expire_session_after_page",
     }
-    assert set(catalog_parameters) == common_parameters | {"protected"}
+    assert set(catalog_parameters) == common_parameters | {"resume_page"}
     assert set(api_parameters) == common_parameters | {"page"}
     assert catalog_parameters["run_id"]["schema"]["default"] == "manual"
     assert api_parameters["page"]["schema"] == {
@@ -384,7 +562,7 @@ def test_openapi_preserves_catalog_query_parameter_contract() -> None:
         "title": "Page",
     }
     assert catalog_parameters["protected"]["schema"]["description"] == (
-        "Require login with configured credentials before serving the catalog shell."
+        "Require an authenticated demo session for catalog and API requests."
     )
 
 

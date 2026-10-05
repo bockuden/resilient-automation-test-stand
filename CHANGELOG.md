@@ -4,6 +4,8 @@
 
 ### Added
 
+- Added deterministic, `run_id`-isolated session expiry at a configured page
+  boundary, including browser re-login and continuation from the interrupted page.
 - Added a deterministic `malformed-api` scenario for invalid JSON, truncated
   JSON, wrong content types, missing required fields, and wrong field types.
 - Added a deterministic `rate-limit` API scenario with configurable `429`
@@ -26,6 +28,8 @@ locator tokens and login field names remain the defaults unless the optional
 scenarios are additive; existing successful, transient, permanent, rate-limit,
 and browser responses remain unchanged. Malformed responses intentionally
 violate the normal OpenAPI response contract only when explicitly selected.
+Session expiry is disabled unless `expire_session_after_page` is configured;
+ordinary API requests remain unprotected unless `protected=true` is explicit.
 
 ## 1.1.5 - 2026-07-28
 
