@@ -32,9 +32,29 @@ const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, mill
 
 function redirectToLogin(page) {
   const returnUrl = new URL(window.location.href);
+  returnUrl.searchParams.set('scenario', config.scenario);
+  returnUrl.searchParams.set('run_id', config.runId);
+  returnUrl.searchParams.set('protected', 'true');
+  returnUrl.searchParams.set('total_pages', config.totalPages);
+  returnUrl.searchParams.set('fail_for', config.failFor);
+  returnUrl.searchParams.set('failure_delay_ms', config.failureDelayMs);
+  returnUrl.searchParams.set('delay_ms', config.delayMs);
+  returnUrl.searchParams.set('fail_page', config.failPage);
+  returnUrl.searchParams.set('rate_limit_for', config.rateLimitFor);
+  returnUrl.searchParams.set('retry_after_seconds', config.retryAfterSeconds);
+  returnUrl.searchParams.set('malformed_mode', config.malformedMode);
+  if (config.expireSessionAfterPage !== null) {
+    returnUrl.searchParams.set('expire_session_after_page', config.expireSessionAfterPage);
+  }
   returnUrl.searchParams.set('resume_page', page);
-  const loginQuery = new URLSearchParams({ next_url: `${returnUrl.pathname}${returnUrl.search}` });
   const failure = config.selectorFailure;
+  if (failure !== null) {
+    returnUrl.searchParams.set('selector_failure_target', failure.target);
+    returnUrl.searchParams.set('selector_failure_mode', failure.mode);
+    returnUrl.searchParams.set('selector_failure_page', failure.page);
+    returnUrl.searchParams.set('selector_failure_delay_ms', failure.delayMs);
+  }
+  const loginQuery = new URLSearchParams({ next_url: `${returnUrl.pathname}${returnUrl.search}` });
   if (failure?.target === 'login_button') {
     loginQuery.set('selector_failure_target', failure.target);
     loginQuery.set('selector_failure_mode', failure.mode);
