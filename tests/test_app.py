@@ -135,6 +135,34 @@ async def test_malformed_api_query_rejects_unknown_mode(client: AsyncClient) -> 
 
 
 @pytest.mark.anyio
+async def test_catalog_shell_preserves_malformed_mode_through_browser_and_login(
+    client: AsyncClient,
+) -> None:
+    configure_scenario_defaults(
+        ScenarioDefaults(
+            scenario="malformed-api",
+            malformed_mode="wrong_field_type",
+            protected=True,
+        )
+    )
+
+    protected = await client.get("/catalog?run_id=browser-malformed", follow_redirects=False)
+    next_url = parse_qs(urlsplit(protected.headers["location"]).query)["next_url"][0]
+    await client.post(
+        "/login",
+        data={"username": "demo", "password": "automation", "next_url": next_url},
+    )
+    shell = await client.get(next_url)
+    script = await client.get("/static/catalog.js")
+
+    assert protected.status_code == 303
+    assert "scenario=malformed-api" in next_url
+    assert "malformed_mode=wrong_field_type" in next_url
+    assert '"malformedMode": "wrong_field_type"' in shell.text
+    assert "malformed_mode: config.malformedMode" in script.text
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize(
     ("scenario", "extra_query", "expected_status", "expected_body"),
     [

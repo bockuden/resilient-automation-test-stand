@@ -403,6 +403,7 @@ async def catalog(
                 "total_pages": defaults.total_pages,
                 "rate_limit_for": defaults.rate_limit_for,
                 "retry_after_seconds": defaults.retry_after_seconds,
+                "malformed_mode": defaults.malformed_mode,
                 "protected": "true",
                 **failure_query,
             }
@@ -420,6 +421,7 @@ async def catalog(
         "totalPages": defaults.total_pages,
         "rateLimitFor": defaults.rate_limit_for,
         "retryAfterSeconds": defaults.retry_after_seconds,
+        "malformedMode": defaults.malformed_mode,
         "selectors": app.state.selectors.model_dump(),
         "selectorFailure": _runtime_selector_failure(defaults),
     }
