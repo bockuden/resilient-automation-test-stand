@@ -139,9 +139,7 @@ def _require_catalog_session(
 
     key = (run_id, boundary)
     with session_state_lock:
-        expired = key not in restored_sessions and (
-            key in expired_sessions or page > boundary
-        )
+        expired = key not in restored_sessions and (key in expired_sessions or page > boundary)
         if expired:
             expired_sessions.add(key)
     if expired:
@@ -302,8 +300,11 @@ async def health() -> dict[str, str]:
 @app.post(
     "/admin/reset",
     operation_id="reset_attempt_counters",
-    summary="Reset deterministic attempt counters",
-    description="Test-only operation that clears all in-memory request-attempt counters.",
+    summary="Reset deterministic runtime state",
+    description=(
+        "Test-only operation that clears all in-memory request-attempt counters and "
+        "session-expiry state."
+    ),
 )
 async def reset() -> dict[str, int]:
     cleared = len(request_attempts)

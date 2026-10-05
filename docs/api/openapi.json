@@ -166,7 +166,7 @@
   "paths": {
     "/admin/reset": {
       "post": {
-        "description": "Test-only operation that clears all in-memory request-attempt counters.",
+        "description": "Test-only operation that clears all in-memory request-attempt counters and session-expiry state.",
         "operationId": "reset_attempt_counters",
         "responses": {
           "200": {
@@ -184,7 +184,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Reset deterministic attempt counters"
+        "summary": "Reset deterministic runtime state"
       }
     },
     "/api/catalog": {
@@ -400,6 +400,44 @@
             }
           },
           {
+            "description": "Require an authenticated demo session for catalog and API requests.",
+            "in": "query",
+            "name": "protected",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Require an authenticated demo session for catalog and API requests.",
+              "title": "Protected"
+            }
+          },
+          {
+            "description": "Expire the authenticated session before the page after this boundary.",
+            "in": "query",
+            "name": "expire_session_after_page",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 20,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Expire the authenticated session before the page after this boundary.",
+              "title": "Expire Session After Page"
+            }
+          },
+          {
             "description": "Browser locator target for the selector-failure scenario.",
             "in": "query",
             "name": "selector_failure_target",
@@ -501,6 +539,22 @@
               "title": "Page",
               "type": "integer"
             }
+          },
+          {
+            "in": "cookie",
+            "name": "demo_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Demo Session"
+            }
           }
         ],
         "responses": {
@@ -513,6 +567,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "description": "Authentication is required or the deterministic session expired."
           },
           "422": {
             "content": {
@@ -750,6 +807,44 @@
             }
           },
           {
+            "description": "Require an authenticated demo session for catalog and API requests.",
+            "in": "query",
+            "name": "protected",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Require an authenticated demo session for catalog and API requests.",
+              "title": "Protected"
+            }
+          },
+          {
+            "description": "Expire the authenticated session before the page after this boundary.",
+            "in": "query",
+            "name": "expire_session_after_page",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 20,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Expire the authenticated session before the page after this boundary.",
+              "title": "Expire Session After Page"
+            }
+          },
+          {
             "description": "Browser locator target for the selector-failure scenario.",
             "in": "query",
             "name": "selector_failure_target",
@@ -839,21 +934,17 @@
             }
           },
           {
-            "description": "Require login with configured credentials before serving the catalog shell.",
+            "description": "Catalog page to load after authentication or re-authentication.",
             "in": "query",
-            "name": "protected",
+            "name": "resume_page",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Require login with configured credentials before serving the catalog shell.",
-              "title": "Protected"
+              "default": 1,
+              "description": "Catalog page to load after authentication or re-authentication.",
+              "maximum": 20,
+              "minimum": 1,
+              "title": "Resume Page",
+              "type": "integer"
             }
           },
           {

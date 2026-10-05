@@ -92,9 +92,7 @@ async def test_protected_api_requires_and_accepts_an_ordinary_session(
         },
         follow_redirects=False,
     )
-    authenticated = await client.get(
-        "/api/catalog?protected=true&run_id=ordinary-session"
-    )
+    authenticated = await client.get("/api/catalog?protected=true&run_id=ordinary-session")
 
     assert unauthenticated.status_code == 401
     assert unauthenticated.json()["detail"] == {"code": "AUTHENTICATION_REQUIRED"}
@@ -169,12 +167,9 @@ async def test_expired_session_state_is_isolated_by_run_id(client: AsyncClient) 
         "/login",
         data={"username": "demo", "password": "automation", "next_url": "/catalog"},
     )
-    first_run = (
-        "/api/catalog?protected=true&run_id=expired-run&expire_session_after_page=1&page=2"
-    )
+    first_run = "/api/catalog?protected=true&run_id=expired-run&expire_session_after_page=1&page=2"
     second_run_page_one = (
-        "/api/catalog?protected=true&run_id=independent-run"
-        "&expire_session_after_page=1&page=1"
+        "/api/catalog?protected=true&run_id=independent-run&expire_session_after_page=1&page=1"
     )
     second_run_page_two = second_run_page_one[:-1] + "2"
 
@@ -195,17 +190,12 @@ async def test_concurrent_expiry_requests_have_one_deterministic_result(
         "/login",
         data={"username": "demo", "password": "automation", "next_url": "/catalog"},
     )
-    url = (
-        "/api/catalog?protected=true&run_id=concurrent-expiry"
-        "&expire_session_after_page=1&page=2"
-    )
+    url = "/api/catalog?protected=true&run_id=concurrent-expiry&expire_session_after_page=1&page=2"
 
     responses = await asyncio.gather(client.get(url), client.get(url), client.get(url))
 
     assert [response.status_code for response in responses] == [401, 401, 401]
-    assert {response.json()["detail"]["code"] for response in responses} == {
-        "SESSION_EXPIRED"
-    }
+    assert {response.json()["detail"]["code"] for response in responses} == {"SESSION_EXPIRED"}
 
 
 @pytest.mark.anyio
@@ -214,9 +204,7 @@ async def test_admin_reset_restores_clean_session_expiry_state(client: AsyncClie
         "/login",
         data={"username": "demo", "password": "automation", "next_url": "/catalog"},
     )
-    base = (
-        "/api/catalog?protected=true&run_id=reset-expiry&expire_session_after_page=2"
-    )
+    base = "/api/catalog?protected=true&run_id=reset-expiry&expire_session_after_page=2"
     assert (await client.get(f"{base}&page=3")).status_code == 401
 
     reset = await client.post("/admin/reset")
