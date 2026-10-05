@@ -81,7 +81,8 @@
               "dom-change",
               "duplicates",
               "selector-failure",
-              "rate-limit"
+              "rate-limit",
+              "malformed-api"
             ],
             "title": "Scenario",
             "type": "string"
@@ -188,7 +189,7 @@
     },
     "/api/catalog": {
       "get": {
-        "description": "Returns deterministic catalog data for retry, pagination, duplicate, rate-limit, delay, and checkpoint-recovery tests.",
+        "description": "Returns deterministic catalog data for retry, pagination, duplicate, rate-limit, delay, checkpoint-recovery, and intentionally malformed-response tests. The malformed-api scenario deliberately violates the documented successful response contract.",
         "operationId": "get_catalog_page",
         "parameters": [
           {
@@ -208,7 +209,8 @@
                     "dom-change",
                     "duplicates",
                     "selector-failure",
-                    "rate-limit"
+                    "rate-limit",
+                    "malformed-api"
                   ],
                   "type": "string"
                 },
@@ -370,6 +372,31 @@
               ],
               "description": "Retry-After value for rate-limit responses, in seconds.",
               "title": "Retry After Seconds"
+            }
+          },
+          {
+            "description": "Deterministic broken-response mode for the malformed-api scenario.",
+            "in": "query",
+            "name": "malformed_mode",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "invalid_json",
+                    "truncated_json",
+                    "wrong_content_type",
+                    "missing_fields",
+                    "wrong_field_type"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Deterministic broken-response mode for the malformed-api scenario.",
+              "title": "Malformed Mode"
             }
           },
           {
@@ -532,7 +559,8 @@
                     "dom-change",
                     "duplicates",
                     "selector-failure",
-                    "rate-limit"
+                    "rate-limit",
+                    "malformed-api"
                   ],
                   "type": "string"
                 },
@@ -694,6 +722,31 @@
               ],
               "description": "Retry-After value for rate-limit responses, in seconds.",
               "title": "Retry After Seconds"
+            }
+          },
+          {
+            "description": "Deterministic broken-response mode for the malformed-api scenario.",
+            "in": "query",
+            "name": "malformed_mode",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "invalid_json",
+                    "truncated_json",
+                    "wrong_content_type",
+                    "missing_fields",
+                    "wrong_field_type"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Deterministic broken-response mode for the malformed-api scenario.",
+              "title": "Malformed Mode"
             }
           },
           {
