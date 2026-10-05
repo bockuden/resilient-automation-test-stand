@@ -3,6 +3,7 @@ import json
 from collections import defaultdict
 from html import escape
 from pathlib import Path
+from threading import Lock
 from typing import Annotated
 from urllib.parse import parse_qs, urlencode, urlsplit
 
@@ -37,6 +38,9 @@ app.state.auth = ResolvedAuth()
 app.state.selectors = SelectorConfig()
 
 request_attempts: dict[tuple[str, str, int], int] = defaultdict(int)
+expired_sessions: set[tuple[str, int]] = set()
+restored_sessions: set[tuple[str, int]] = set()
+session_state_lock = Lock()
 
 
 def configure_scenario_defaults(defaults: ScenarioDefaults) -> None:
@@ -60,6 +64,7 @@ def _resolved_defaults(query: "CatalogQuery") -> ScenarioDefaults:
             exclude={
                 "page",
                 "run_id",
+                "resume_page",
                 "selector_failure_target",
                 "selector_failure_mode",
                 "selector_failure_page",
@@ -91,6 +96,59 @@ def _runtime_selector_failure(defaults: ScenarioDefaults) -> dict[str, object] |
         "page": failure.page,
         "delayMs": failure.delay_ms,
     }
+
+
+def _session_key_from_catalog_url(url: str) -> tuple[str, int] | None:
+    parameters = parse_qs(urlsplit(url).query)
+    boundary_values = parameters.get("expire_session_after_page")
+    if not boundary_values:
+        return None
+    try:
+        boundary = int(boundary_values[0])
+    except ValueError:
+        return None
+    if not 1 <= boundary <= 20:
+        return None
+    run_id = parameters.get("run_id", ["manual"])[0]
+    return (run_id, boundary)
+
+
+def _restore_expired_session(url: str) -> None:
+    key = _session_key_from_catalog_url(url)
+    if key is None:
+        return
+    with session_state_lock:
+        if key in expired_sessions:
+            expired_sessions.remove(key)
+            restored_sessions.add(key)
+
+
+def _require_catalog_session(
+    run_id: str,
+    page: int,
+    boundary: int | None,
+    demo_session: str | None,
+) -> None:
+    if demo_session != "authenticated":
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "AUTHENTICATION_REQUIRED"},
+        )
+    if boundary is None:
+        return
+
+    key = (run_id, boundary)
+    with session_state_lock:
+        expired = key not in restored_sessions and (
+            key in expired_sessions or page > boundary
+        )
+        if expired:
+            expired_sessions.add(key)
+    if expired:
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "SESSION_EXPIRED", "expired_after_page": boundary},
+        )
 
 
 class CatalogItem(BaseModel):
@@ -162,6 +220,16 @@ class CatalogQuery(BaseModel):
         default=None,
         description="Deterministic broken-response mode for the malformed-api scenario.",
     )
+    protected: bool | None = Field(
+        default=None,
+        description="Require an authenticated demo session for catalog and API requests.",
+    )
+    expire_session_after_page: int | None = Field(
+        default=None,
+        ge=1,
+        le=20,
+        description="Expire the authenticated session before the page after this boundary.",
+    )
     selector_failure_target: SelectorFailureTarget | None = Field(
         default=None,
         description="Browser locator target for the selector-failure scenario.",
@@ -204,9 +272,11 @@ class CatalogQuery(BaseModel):
 
 
 class CatalogShellQuery(CatalogQuery):
-    protected: bool | None = Field(
-        default=None,
-        description="Require login with configured credentials before serving the catalog shell.",
+    resume_page: int = Field(
+        default=1,
+        ge=1,
+        le=20,
+        description="Catalog page to load after authentication or re-authentication.",
     )
 
 
@@ -238,6 +308,9 @@ async def health() -> dict[str, str]:
 async def reset() -> dict[str, int]:
     cleared = len(request_attempts)
     request_attempts.clear()
+    with session_state_lock:
+        expired_sessions.clear()
+        restored_sessions.clear()
     return {"clearedCounters": cleared}
 
 
@@ -361,6 +434,7 @@ async def login(
     safe_next = (
         next_url if next_url.startswith("/") and not next_url.startswith("//") else "/catalog"
     )
+    _restore_expired_session(safe_next)
     response = RedirectResponse(safe_next, status_code=303)
     response.set_cookie("demo_session", "authenticated", httponly=True, samesite="lax")
     return response
@@ -382,14 +456,20 @@ async def catalog(
     demo_session: Annotated[str | None, Cookie()] = None,
 ) -> HTMLResponse:
     defaults = _resolved_defaults(query)
+    requires_session = defaults.protected or defaults.expire_session_after_page is not None
 
-    if defaults.protected and demo_session != "authenticated":
+    if requires_session and demo_session != "authenticated":
         failure_query = (
             {
                 f"selector_failure_{name}": value
                 for name, value in defaults.selector_failure.model_dump().items()
             }
             if defaults.selector_failure is not None
+            else {}
+        )
+        expiry_query = (
+            {"expire_session_after_page": defaults.expire_session_after_page}
+            if defaults.expire_session_after_page is not None
             else {}
         )
         target_query = urlencode(
@@ -405,6 +485,8 @@ async def catalog(
                 "retry_after_seconds": defaults.retry_after_seconds,
                 "malformed_mode": defaults.malformed_mode,
                 "protected": "true",
+                "resume_page": query.resume_page,
+                **expiry_query,
                 **failure_query,
             }
         )
@@ -422,6 +504,9 @@ async def catalog(
         "rateLimitFor": defaults.rate_limit_for,
         "retryAfterSeconds": defaults.retry_after_seconds,
         "malformedMode": defaults.malformed_mode,
+        "protected": requires_session,
+        "expireSessionAfterPage": defaults.expire_session_after_page,
+        "initialPage": query.resume_page,
         "selectors": app.state.selectors.model_dump(),
         "selectorFailure": _runtime_selector_failure(defaults),
     }
@@ -439,6 +524,7 @@ async def catalog(
         "scenario deliberately violates the documented successful response contract."
     ),
     responses={
+        401: {"description": "Authentication is required or the deterministic session expired."},
         500: {"description": "Permanent or checkpoint-resume scenario failure."},
         503: {"description": "Transient scenario failure; includes the Retry-After header."},
         429: {"description": "Rate-limit scenario response; includes the Retry-After header."},
@@ -446,8 +532,16 @@ async def catalog(
 )
 async def catalog_api(
     query: Annotated[CatalogApiQuery, Query()],
+    demo_session: Annotated[str | None, Cookie()] = None,
 ) -> CatalogPage | Response:
     defaults = _resolved_defaults(query)
+    if query.protected is True or defaults.expire_session_after_page is not None:
+        _require_catalog_session(
+            query.run_id,
+            query.page,
+            defaults.expire_session_after_page,
+            demo_session,
+        )
     key = (query.run_id, defaults.scenario, query.page)
     request_attempts[key] += 1
     attempt = request_attempts[key]

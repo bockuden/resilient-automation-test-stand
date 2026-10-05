@@ -30,6 +30,20 @@ function setFailureState(element, target, page, testId) {
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
+function redirectToLogin(page) {
+  const returnUrl = new URL(window.location.href);
+  returnUrl.searchParams.set('resume_page', page);
+  const loginQuery = new URLSearchParams({ next_url: `${returnUrl.pathname}${returnUrl.search}` });
+  const failure = config.selectorFailure;
+  if (failure?.target === 'login_button') {
+    loginQuery.set('selector_failure_target', failure.target);
+    loginQuery.set('selector_failure_mode', failure.mode);
+    loginQuery.set('selector_failure_page', failure.page);
+    loginQuery.set('selector_failure_delay_ms', failure.delayMs);
+  }
+  window.location.assign(`/login?${loginQuery}`);
+}
+
 async function loadPage(page) {
   status.textContent = `Loading page ${page}...`;
   status.dataset.state = 'loading';
@@ -47,10 +61,24 @@ async function loadPage(page) {
     rate_limit_for: config.rateLimitFor,
     retry_after_seconds: config.retryAfterSeconds,
     malformed_mode: config.malformedMode,
+    protected: config.protected,
   });
+  if (config.expireSessionAfterPage !== null) {
+    query.set('expire_session_after_page', config.expireSessionAfterPage);
+  }
 
   try {
     const response = await fetch(`/api/catalog?${query}`);
+    if (response.status === 401) {
+      const failure = await response.json();
+      if (
+        failure.detail?.code === 'AUTHENTICATION_REQUIRED' ||
+        failure.detail?.code === 'SESSION_EXPIRED'
+      ) {
+        redirectToLogin(page);
+        return;
+      }
+    }
     if (!response.ok) {
       const retryAfter = response.headers.get('Retry-After');
       throw new Error(`HTTP ${response.status}${retryAfter ? `; retry-after=${retryAfter}` : ''}`);
@@ -109,4 +137,4 @@ async function loadPage(page) {
   }
 }
 
-loadPage(1);
+loadPage(config.initialPage);
