@@ -120,6 +120,32 @@ retry_after_seconds = 12
     )
 
 
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "invalid_json",
+        "truncated_json",
+        "wrong_content_type",
+        "missing_fields",
+        "wrong_field_type",
+    ],
+)
+def test_malformed_api_modes_load_from_preset(tmp_path: Path, mode: str) -> None:
+    path = write_config(
+        tmp_path / "malformed-api.toml",
+        f"""
+[presets.broken-upstream]
+scenario = "malformed-api"
+malformed_mode = "{mode}"
+""",
+    )
+
+    assert load_preset_document(path).presets["broken-upstream"] == ScenarioDefaults(
+        scenario="malformed-api",
+        malformed_mode=mode,
+    )
+
+
 def test_custom_auth_credentials_load_from_toml(tmp_path: Path) -> None:
     path = write_config(
         tmp_path / "scenarios.toml",
@@ -251,6 +277,7 @@ password_env = "EMPTY_TEST_PASSWORD"
         "[presets.rate-limit]\nrate_limit_for = -1\n",
         "[presets.rate-limit]\nrate_limit_for = 11\n",
         "[presets.rate-limit]\nretry_after_seconds = 301\n",
+        '[presets.malformed]\nscenario = "malformed-api"\nmalformed_mode = "random"\n',
         "presets = 'not a table'\n",
     ],
 )
