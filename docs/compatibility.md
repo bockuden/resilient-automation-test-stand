@@ -45,13 +45,14 @@ except that `protected` exists only on `/catalog`; `page` exists only on
 | Parameter | Default | Valid values | Meaning |
 | --- | --- | --- | --- |
 | `page` | `1` | integer `1..20` | API page to fetch. |
-| `scenario` | `success` | `success`, `transient`, `rate-limit`, `permanent`, `slow`, `resume`, `dom-change`, `duplicates`, `selector-failure` | Deterministic behavior. |
+| `scenario` | `success` | `success`, `transient`, `rate-limit`, `permanent`, `slow`, `resume`, `dom-change`, `duplicates`, `selector-failure`, `malformed-api` | Deterministic behavior. |
 | `run_id` | `manual` | any string | Opaque identifier that isolates counters by `(run_id, scenario, page)`. |
 | `total_pages` | `4` | integer `1..20` | Number of catalog pages exposed. |
 | `fail_for` | `2` | integer `0..10` | Initial `503` responses per page in `transient`. |
 | `failure_delay_ms` | `0` | integer `0..30000` | Delay before each transient `503`. |
 | `rate_limit_for` | `2` | integer `0..10` | Initial `429` responses per page in `rate-limit`. |
 | `retry_after_seconds` | `1` | integer `0..300` | `Retry-After` delta-seconds value in `rate-limit`. |
+| `malformed_mode` | `invalid_json` | `invalid_json`, `truncated_json`, `wrong_content_type`, `missing_fields`, `wrong_field_type` | Deterministic contract violation emitted by `malformed-api`. |
 | `delay_ms` | `1500` | integer `0..30000` | Delay per API response in `slow`. |
 | `fail_page` | `3` | integer `1..20` | Permanently failing page in `resume`. |
 | `protected` | `false` | boolean | Require demo login for `/catalog`; it does not protect `/api/catalog`. |
@@ -85,6 +86,12 @@ empty.
   locator failure only to its target and page in the browser UI. Presets use
   `[presets.NAME.selector_failure]` with `target`, `mode`, and optional `page` /
   `delay_ms`; `login_button` applies only to page 1.
+- `malformed-api` returns status `200` and deliberately violates the normal
+  OpenAPI `CatalogPage` response contract. `invalid_json` emits a fixed invalid
+  token, `truncated_json` removes the final byte from an otherwise normal page,
+  `wrong_content_type` returns a normal JSON page as `text/plain`,
+  `missing_fields` omits `items`, and `wrong_field_type` returns `items` as a
+  string. Payload construction and truncation points are deterministic.
 - Invalid constrained values return FastAPI's standard `422` validation body.
 
 Scenario failures expose `detail.code` as one of
@@ -123,8 +130,8 @@ so the `login_button` target is exercised before authentication.
 
 `--preset`, `--list-presets`, and `--print-url` are mutually exclusive. Invalid
 or unknown presets and missing config produce actionable argparse errors. Preset
-files accept documented `ScenarioDefaults` fields, including the optional
-nested `selector_failure` table, and reject unknown fields.
+files accept documented `ScenarioDefaults` fields, including `malformed_mode`
+and the optional nested `selector_failure` table, and reject unknown fields.
 
 ## Contract verification
 

@@ -78,6 +78,131 @@ async def test_transient_scenario_fails_twice_then_recovers(client: AsyncClient)
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("mode", "expected_content_type", "expected_body"),
+    [
+        ("invalid_json", "application/json", '{"page":20,"items":[INVALID]}'),
+        (
+            "truncated_json",
+            "application/json",
+            '{"page":20,"total_pages":1,"items":[],"scenario":"malformed-api","attempt":1',
+        ),
+        (
+            "wrong_content_type",
+            "text/plain",
+            '{"page":20,"total_pages":1,"items":[],"scenario":"malformed-api","attempt":1}',
+        ),
+        (
+            "missing_fields",
+            "application/json",
+            '{"page":20,"total_pages":1,"scenario":"malformed-api","attempt":1}',
+        ),
+        (
+            "wrong_field_type",
+            "application/json",
+            '{"page":20,"total_pages":1,"items":"not-a-list",'
+            '"scenario":"malformed-api","attempt":1}',
+        ),
+    ],
+)
+async def test_malformed_api_modes_return_exact_deterministic_responses(
+    client: AsyncClient,
+    mode: str,
+    expected_content_type: str,
+    expected_body: str,
+) -> None:
+    url = (
+        "/api/catalog?scenario=malformed-api&run_id=malformed-replay&page=20"
+        f"&total_pages=1&malformed_mode={mode}"
+    )
+
+    first = await client.get(url)
+    await client.post("/admin/reset")
+    replay = await client.get(url)
+
+    assert first.status_code == replay.status_code == 200
+    assert first.headers["content-type"] == replay.headers["content-type"] == expected_content_type
+    assert first.text == replay.text == expected_body
+
+
+@pytest.mark.anyio
+async def test_malformed_api_query_rejects_unknown_mode(client: AsyncClient) -> None:
+    response = await client.get(
+        "/api/catalog?scenario=malformed-api&malformed_mode=random_truncation"
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_catalog_shell_preserves_malformed_mode_through_browser_and_login(
+    client: AsyncClient,
+) -> None:
+    configure_scenario_defaults(
+        ScenarioDefaults(
+            scenario="malformed-api",
+            malformed_mode="wrong_field_type",
+            protected=True,
+        )
+    )
+
+    protected = await client.get("/catalog?run_id=browser-malformed", follow_redirects=False)
+    next_url = parse_qs(urlsplit(protected.headers["location"]).query)["next_url"][0]
+    await client.post(
+        "/login",
+        data={"username": "demo", "password": "automation", "next_url": next_url},
+    )
+    shell = await client.get(next_url)
+    script = await client.get("/static/catalog.js")
+
+    assert protected.status_code == 303
+    assert "scenario=malformed-api" in next_url
+    assert "malformed_mode=wrong_field_type" in next_url
+    assert '"malformedMode": "wrong_field_type"' in shell.text
+    assert "malformed_mode: config.malformedMode" in script.text
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("scenario", "extra_query", "expected_status", "expected_body"),
+    [
+        (
+            "success",
+            "&total_pages=1&page=20",
+            200,
+            '{"page":20,"total_pages":1,"items":[],"scenario":"success","attempt":1}',
+        ),
+        (
+            "transient",
+            "&fail_for=1",
+            503,
+            '{"detail":{"code":"TRANSIENT_CATALOG_FAILURE","attempt":1}}',
+        ),
+        (
+            "permanent",
+            "",
+            500,
+            '{"detail":{"code":"PERMANENT_CATALOG_FAILURE","attempt":1}}',
+        ),
+    ],
+)
+async def test_existing_api_responses_remain_unchanged(
+    client: AsyncClient,
+    scenario: str,
+    extra_query: str,
+    expected_status: int,
+    expected_body: str,
+) -> None:
+    response = await client.get(
+        f"/api/catalog?scenario={scenario}&run_id=unchanged-{scenario}{extra_query}"
+    )
+
+    assert response.status_code == expected_status
+    assert response.headers["content-type"] == "application/json"
+    assert response.text == expected_body
+
+
+@pytest.mark.anyio
 async def test_rate_limit_scenario_returns_exactly_n_429s_then_recovers(
     client: AsyncClient,
 ) -> None:
@@ -245,6 +370,7 @@ def test_openapi_preserves_catalog_query_parameter_contract() -> None:
         "selector_failure_delay_ms",
         "rate_limit_for",
         "retry_after_seconds",
+        "malformed_mode",
     }
     assert set(catalog_parameters) == common_parameters | {"protected"}
     assert set(api_parameters) == common_parameters | {"page"}

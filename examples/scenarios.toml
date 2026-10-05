@@ -41,3 +41,7 @@ page = 2
 scenario = "rate-limit"
 rate_limit_for = 2
 retry_after_seconds = 1
+
+[presets.malformed-json]
+scenario = "malformed-api"
+malformed_mode = "invalid_json"

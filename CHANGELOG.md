@@ -4,6 +4,8 @@
 
 ### Added
 
+- Added a deterministic `malformed-api` scenario for invalid JSON, truncated
+  JSON, wrong content types, missing required fields, and wrong field types.
 - Added a deterministic `rate-limit` API scenario with configurable `429`
   attempts and an exact `Retry-After` header value.
 - Added deterministic browser selector failure scenarios for missing, changed,
@@ -20,8 +22,10 @@ Existing preset files and protected login flows continue to work unchanged.
 Authentication remains enabled per scenario with `protected=true`; credentials
 are resolved once from the global config and environment. Existing browser
 locator tokens and login field names remain the defaults unless the optional
-`[selectors]` table is configured. The selector-failure scenario is additive;
-existing catalog API payloads and the `dom-change` behavior remain unchanged.
+`[selectors]` table is configured. The selector-failure and malformed API
+scenarios are additive; existing successful, transient, permanent, rate-limit,
+and browser responses remain unchanged. Malformed responses intentionally
+violate the normal OpenAPI response contract only when explicitly selected.
 
 ## 1.1.5 - 2026-07-28
 

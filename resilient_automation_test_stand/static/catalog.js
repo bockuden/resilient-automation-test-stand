@@ -46,6 +46,7 @@ async function loadPage(page) {
     total_pages: config.totalPages,
     rate_limit_for: config.rateLimitFor,
     retry_after_seconds: config.retryAfterSeconds,
+    malformed_mode: config.malformedMode,
   });
 
   try {

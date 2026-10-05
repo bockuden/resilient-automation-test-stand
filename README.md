@@ -76,6 +76,7 @@ across an ordered sequence of requests.
 | `duplicates` | Each page after the first begins with the previous page's final item ID. | It deduplicates records across pagination boundaries. |
 | `dom-change` | CSS classes and element nesting change while stable `data-testid` locators remain. | It uses semantic or stable locators rather than DOM shape. |
 | `selector-failure` | One configured browser locator is missing, changed, duplicated, delayed, hidden, or disabled on a selected page. | It retries locator strategies and applies a fallback only when the target is unavailable. |
+| `malformed-api` | The API returns one selected deterministic contract violation: invalid JSON, truncated JSON, a wrong content type, missing fields, or a wrong field type. | It rejects or safely handles broken upstream responses without silently accepting corrupt data. |
 | `protected=true` | The browser route redirects through the configured login and back to the original catalog URL. | It preserves the session cookie and return URL. |
 
 ## Where WireMock and Toxiproxy fit
@@ -351,7 +352,7 @@ transient recovery, login, DOM changes, duplicates, resume, and cancellation.
 For repeated scenarios, the same values can be stored in a TOML file instead
 of copied into every startup command. The repository includes
 [`examples/scenarios.toml`](https://github.com/bockuden/resilient-automation-test-stand/blob/main/examples/scenarios.toml) with the three cookbook
-scenarios above, a selector-failure preset, and a rate-limited preset.
+scenarios above, selector-failure and rate-limit presets, and a malformed JSON preset.
 
 These CLI commands are identical in PowerShell, Linux, and macOS shells:
 
@@ -396,6 +397,22 @@ retry_after_seconds = 1
 ```
 
 The counter is isolated by `run_id` and page; `POST /admin/reset` clears it.
+
+The `malformed-api` scenario intentionally bypasses normal response-model
+serialization so clients can exercise broken upstream handling. Select one of
+`invalid_json`, `truncated_json`, `wrong_content_type`, `missing_fields`, or
+`wrong_field_type`. Every mode uses a fixed payload construction; the same
+configuration, `run_id`, and request sequence produce the same response bytes.
+
+```toml
+[presets.malformed-json]
+scenario = "malformed-api"
+malformed_mode = "invalid_json"
+```
+
+These responses deliberately violate the normal OpenAPI `CatalogPage` response
+contract. They still return status `200`, allowing a client to distinguish
+payload and media-type validation failures from HTTP status failures.
 
 To simulate a missing next-page locator on page 2, add a selector failure to a
 preset. Supported targets are `login_button`, `item`, and `next_page`; modes
@@ -465,6 +482,7 @@ also accepts `page` from 1 through 20.
 | `failure_delay_ms` | `0` | Delay before each transient `503` response (0-30000 ms) |
 | `rate_limit_for` | `2` | Initial `429` responses per page in `rate-limit` (0-10) |
 | `retry_after_seconds` | `1` | `Retry-After` header value in `rate-limit` (0-300 seconds) |
+| `malformed_mode` | `invalid_json` | Broken response emitted by `malformed-api`: `invalid_json`, `truncated_json`, `wrong_content_type`, `missing_fields`, or `wrong_field_type` |
 | `delay_ms` | `1500` | Delay per API request in `slow` (0-30000 ms) |
 | `fail_page` | `3` | Permanently failing page in `resume` (1-20) |
 | `protected` | `false` | Require the demo login before serving `/catalog` |

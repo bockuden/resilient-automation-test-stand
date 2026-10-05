@@ -7,11 +7,12 @@ from typing import Annotated
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 from fastapi import Cookie, FastAPI, Form, HTTPException, Query
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
 from resilient_automation_test_stand.presets import (
+    MalformedMode,
     ResolvedAuth,
     Scenario,
     ScenarioDefaults,
@@ -156,6 +157,10 @@ class CatalogQuery(BaseModel):
         ge=0,
         le=300,
         description="Retry-After value for rate-limit responses, in seconds.",
+    )
+    malformed_mode: MalformedMode | None = Field(
+        default=None,
+        description="Deterministic broken-response mode for the malformed-api scenario.",
     )
     selector_failure_target: SelectorFailureTarget | None = Field(
         default=None,
@@ -398,6 +403,7 @@ async def catalog(
                 "total_pages": defaults.total_pages,
                 "rate_limit_for": defaults.rate_limit_for,
                 "retry_after_seconds": defaults.retry_after_seconds,
+                "malformed_mode": defaults.malformed_mode,
                 "protected": "true",
                 **failure_query,
             }
@@ -415,6 +421,7 @@ async def catalog(
         "totalPages": defaults.total_pages,
         "rateLimitFor": defaults.rate_limit_for,
         "retryAfterSeconds": defaults.retry_after_seconds,
+        "malformedMode": defaults.malformed_mode,
         "selectors": app.state.selectors.model_dump(),
         "selectorFailure": _runtime_selector_failure(defaults),
     }
@@ -428,7 +435,8 @@ async def catalog(
     summary="Fetch one deterministic catalog page",
     description=(
         "Returns deterministic catalog data for retry, pagination, duplicate, rate-limit, delay, "
-        "and checkpoint-recovery tests."
+        "checkpoint-recovery, and intentionally malformed-response tests. The malformed-api "
+        "scenario deliberately violates the documented successful response contract."
     ),
     responses={
         500: {"description": "Permanent or checkpoint-resume scenario failure."},
@@ -438,7 +446,7 @@ async def catalog(
 )
 async def catalog_api(
     query: Annotated[CatalogApiQuery, Query()],
-) -> CatalogPage:
+) -> CatalogPage | Response:
     defaults = _resolved_defaults(query)
     key = (query.run_id, defaults.scenario, query.page)
     request_attempts[key] += 1
@@ -475,12 +483,43 @@ async def catalog_api(
     if defaults.scenario == "slow":
         await asyncio.sleep(defaults.delay_ms / 1000)
 
-    return CatalogPage(
+    page = CatalogPage(
         page=query.page,
         total_pages=defaults.total_pages,
         items=_items_for_page(query.page, defaults.scenario, defaults.total_pages),
         scenario=defaults.scenario,
         attempt=attempt,
+    )
+    if defaults.scenario == "malformed-api":
+        return _malformed_api_response(page, defaults.malformed_mode)
+    return page
+
+
+def _malformed_api_response(page: CatalogPage, mode: MalformedMode) -> Response:
+    """Return a deterministic response that deliberately violates CatalogPage."""
+
+    valid_payload = page.model_dump(mode="json")
+    if mode == "invalid_json":
+        content = f'{{"page":{page.page},"items":[INVALID]}}'
+    elif mode == "truncated_json":
+        content = page.model_dump_json()[:-1]
+    elif mode == "wrong_content_type":
+        return Response(
+            content=page.model_dump_json(),
+            status_code=200,
+            headers={"Content-Type": "text/plain"},
+        )
+    elif mode == "missing_fields":
+        del valid_payload["items"]
+        content = json.dumps(valid_payload, separators=(",", ":"))
+    else:
+        valid_payload["items"] = "not-a-list"
+        content = json.dumps(valid_payload, separators=(",", ":"))
+
+    return Response(
+        content=content,
+        status_code=200,
+        headers={"Content-Type": "application/json"},
     )
 
 

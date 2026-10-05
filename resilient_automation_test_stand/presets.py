@@ -30,10 +30,18 @@ Scenario = Literal[
     "duplicates",
     "selector-failure",
     "rate-limit",
+    "malformed-api",
 ]
 
 SelectorFailureTarget = Literal["login_button", "item", "next_page"]
 SelectorFailureMode = Literal["missing", "changed", "multiple", "delayed", "hidden", "disabled"]
+MalformedMode = Literal[
+    "invalid_json",
+    "truncated_json",
+    "wrong_content_type",
+    "missing_fields",
+    "wrong_field_type",
+]
 
 
 class SelectorFailureConfig(BaseModel):
@@ -67,6 +75,7 @@ class ScenarioDefaults(BaseModel):
     fail_page: int = Field(default=3, ge=1, le=20)
     rate_limit_for: int = Field(default=2, ge=0, le=10)
     retry_after_seconds: int = Field(default=1, ge=0, le=300)
+    malformed_mode: MalformedMode = "invalid_json"
     selector_failure: SelectorFailureConfig | None = None
 
 
