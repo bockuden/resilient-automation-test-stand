@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
@@ -118,6 +119,58 @@ retry_after_seconds = 12
         rate_limit_for=3,
         retry_after_seconds=12,
     )
+
+
+def test_composite_event_preset_loads_ordered_typed_events(tmp_path: Path) -> None:
+    path = write_config(
+        tmp_path / "composite.toml",
+        """
+[presets.nightmare]
+protected = true
+total_pages = 10
+
+[[presets.nightmare.events]]
+page = 2
+type = "http_error"
+status = 503
+attempts = 2
+
+[[presets.nightmare.events]]
+page = 4
+type = "duplicate_items"
+
+[[presets.nightmare.events]]
+page = 5
+type = "expire_session"
+
+[[presets.nightmare.events]]
+page = 7
+type = "selector_change"
+target = "next_page"
+
+[[presets.nightmare.events]]
+page = 9
+type = "delay"
+delay_ms = 3000
+""",
+    )
+
+    preset = load_preset_document(path).presets["nightmare"]
+
+    assert [event.type for event in preset.events] == [
+        "http_error",
+        "duplicate_items",
+        "expire_session",
+        "selector_change",
+        "delay",
+    ]
+    assert [event.page for event in preset.events] == [2, 4, 5, 7, 9]
+    assert preset.events[0].model_dump() == {
+        "type": "http_error",
+        "page": 2,
+        "status": 503,
+        "attempts": 2,
+    }
 
 
 @pytest.mark.parametrize(
@@ -298,6 +351,16 @@ password_env = "EMPTY_TEST_PASSWORD"
         '[presets.malformed]\nscenario = "malformed-api"\nmalformed_mode = "random"\n',
         "[presets.session-expiry]\nexpire_session_after_page = 0\n",
         "[presets.session-expiry]\nexpire_session_after_page = 21\n",
+        '[presets.invalid]\ntotal_pages = 4\n[[presets.invalid.events]]\ntype = "unknown"\npage = 2\n',
+        '[presets.invalid]\ntotal_pages = 4\n[[presets.invalid.events]]\ntype = "http_error"\npage = 2\nstatus = 500\n',
+        '[presets.invalid]\ntotal_pages = 4\n[[presets.invalid.events]]\ntype = "delay"\npage = 2\n',
+        '[presets.invalid]\ntotal_pages = 4\n[[presets.invalid.events]]\ntype = "duplicate_items"\npage = 1\n',
+        '[presets.invalid]\ntotal_pages = 4\n[[presets.invalid.events]]\ntype = "selector_change"\npage = 2\n',
+        '[presets.invalid]\ntotal_pages = 4\n[[presets.invalid.events]]\ntype = "delay"\npage = 5\ndelay_ms = 10\n',
+        '[presets.invalid]\nscenario = "transient"\n[[presets.invalid.events]]\ntype = "delay"\npage = 2\ndelay_ms = 10\n',
+        '[presets.invalid]\ntotal_pages = 4\n[[presets.invalid.events]]\ntype = "delay"\npage = 2\ndelay_ms = 10\n[[presets.invalid.events]]\ntype = "delay"\npage = 2\ndelay_ms = 20\n',
+        '[presets.invalid]\ntotal_pages = 4\n[[presets.invalid.events]]\ntype = "expire_session"\npage = 2\n[[presets.invalid.events]]\ntype = "expire_session"\npage = 3\n',
+        '[presets.invalid]\ntotal_pages = 4\nexpire_session_after_page = 2\n[[presets.invalid.events]]\ntype = "expire_session"\npage = 3\n',
         "presets = 'not a table'\n",
     ],
 )
@@ -357,6 +420,29 @@ def test_preset_url_flattens_selector_failure_settings() -> None:
     assert query["selector_failure_mode"] == ["missing"]
     assert query["selector_failure_page"] == ["2"]
     assert query["selector_failure_delay_ms"] == ["500"]
+
+
+def test_preset_url_serializes_composite_events_as_portable_json() -> None:
+    defaults = ScenarioDefaults.model_validate(
+        {
+            "total_pages": 5,
+            "events": [
+                {"type": "http_error", "page": 2, "status": 503, "attempts": 2},
+                {"type": "delay", "page": 2, "delay_ms": 250},
+                {"type": "duplicate_items", "page": 4},
+            ],
+        }
+    )
+
+    query = parse_qs(
+        urlsplit(preset_url("composite", defaults, "http://localhost:8080/catalog")).query
+    )
+
+    assert json.loads(query["events_json"][0]) == [
+        {"type": "http_error", "page": 2, "status": 503, "attempts": 2},
+        {"type": "delay", "page": 2, "delay_ms": 250},
+        {"type": "duplicate_items", "page": 4},
+    ]
 
 
 def test_rate_limit_preset_url_contains_overridable_rate_limit_values() -> None:
