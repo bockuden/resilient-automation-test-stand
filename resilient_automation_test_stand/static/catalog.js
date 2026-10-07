@@ -7,9 +7,17 @@ catalog.dataset.testid = config.selectors.catalog;
 
 function failureMode(target, page) {
   const failure = config.selectorFailure;
-  return config.scenario === 'selector-failure' && failure?.target === target && failure.page === page
-    ? failure.mode
-    : null;
+  if (
+    config.scenario === 'selector-failure' &&
+    failure?.target === target &&
+    failure.page === page
+  ) {
+    return failure.mode;
+  }
+  const composite = config.compositeEvents.find(
+    (event) => event.type === 'selector_change' && event.target === target && event.page === page,
+  );
+  return composite ? 'changed' : null;
 }
 
 function setFailureState(element, target, page, testId) {
@@ -45,6 +53,9 @@ function redirectToLogin(page) {
   returnUrl.searchParams.set('malformed_mode', config.malformedMode);
   if (config.expireSessionAfterPage !== null) {
     returnUrl.searchParams.set('expire_session_after_page', config.expireSessionAfterPage);
+  }
+  if (config.compositeEvents.length > 0) {
+    returnUrl.searchParams.set('events_json', JSON.stringify(config.compositeEvents));
   }
   returnUrl.searchParams.set('resume_page', page);
   const failure = config.selectorFailure;
@@ -85,6 +96,9 @@ async function loadPage(page) {
   });
   if (config.expireSessionAfterPage !== null) {
     query.set('expire_session_after_page', config.expireSessionAfterPage);
+  }
+  if (config.compositeEvents.length > 0) {
+    query.set('events_json', JSON.stringify(config.compositeEvents));
   }
 
   try {

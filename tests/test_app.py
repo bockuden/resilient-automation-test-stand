@@ -1,6 +1,7 @@
 import asyncio
+import json
 from pathlib import Path
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -251,6 +252,153 @@ async def test_browser_runtime_redirects_and_resumes_expired_session(
     assert "returnUrl.searchParams.set('resume_page', page)" in script.text
     assert "window.location.assign(`/login?${loginQuery}`)" in script.text
     assert "loadPage(config.initialPage)" in script.text
+
+
+@pytest.mark.anyio
+async def test_composite_events_execute_in_stable_order_across_pages(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events = [
+        {"page": 2, "type": "http_error", "status": 503, "attempts": 2},
+        {"page": 2, "type": "delay", "delay_ms": 250},
+        {"page": 4, "type": "duplicate_items"},
+        {"page": 5, "type": "expire_session"},
+        {"page": 7, "type": "selector_change", "target": "next_page"},
+    ]
+    events_json = json.dumps(events, separators=(",", ":"))
+    base_params = {
+        "scenario": "success",
+        "run_id": "ordered-composite",
+        "total_pages": 10,
+        "events_json": events_json,
+    }
+    next_url = f"/catalog?{urlencode(base_params)}"
+    await client.post(
+        "/login",
+        data={"username": "demo", "password": "automation", "next_url": next_url},
+    )
+
+    delays: list[float] = []
+
+    async def record_sleep(seconds: float) -> None:
+        delays.append(seconds)
+
+    monkeypatch.setattr(app_module.asyncio, "sleep", record_sleep)
+
+    page_two_params = {**base_params, "page": 2}
+    first_failure = await client.get("/api/catalog", params=page_two_params)
+    second_failure = await client.get("/api/catalog", params=page_two_params)
+    recovered = await client.get("/api/catalog", params=page_two_params)
+    duplicate_page = await client.get("/api/catalog", params={**base_params, "page": 4})
+    expired = await client.get("/api/catalog", params={**base_params, "page": 5})
+
+    relogin = await client.post(
+        "/login",
+        data={"username": "demo", "password": "automation", "next_url": next_url},
+        follow_redirects=False,
+    )
+    restored = await client.get("/api/catalog", params={**base_params, "page": 5})
+    shell = await client.get("/catalog", params=base_params)
+    script = await client.get("/static/catalog.js")
+
+    assert [first_failure.status_code, second_failure.status_code] == [503, 503]
+    assert first_failure.json()["detail"] == {"code": "COMPOSITE_HTTP_ERROR", "attempt": 1}
+    assert second_failure.json()["detail"] == {"code": "COMPOSITE_HTTP_ERROR", "attempt": 2}
+    assert recovered.status_code == 200
+    assert recovered.json()["attempt"] == 3
+    assert delays == [0.25]
+    assert duplicate_page.json()["items"][0]["id"] == "item-015"
+    assert expired.status_code == 401
+    assert expired.json()["detail"] == {"code": "SESSION_EXPIRED", "expired_after_page": 4}
+    assert relogin.status_code == 303
+    assert relogin.headers["location"] == next_url
+    assert restored.status_code == 200
+    assert shell.status_code == 200
+    assert '"compositeEvents":' in shell.text
+    assert '"type": "selector_change"' in shell.text
+    assert "event.type === 'selector_change'" in script.text
+    assert "query.set('events_json'" in script.text
+
+
+@pytest.mark.anyio
+async def test_composite_event_replay_is_deterministic_after_reset(client: AsyncClient) -> None:
+    params = {
+        "scenario": "success",
+        "run_id": "composite-replay",
+        "page": 3,
+        "events_json": json.dumps(
+            [{"page": 3, "type": "http_error", "status": 503, "attempts": 2}],
+            separators=(",", ":"),
+        ),
+    }
+
+    first_run = [await client.get("/api/catalog", params=params) for _ in range(3)]
+    reset = await client.post("/admin/reset")
+    replay = [await client.get("/api/catalog", params=params) for _ in range(3)]
+
+    assert reset.status_code == 200
+    assert [response.status_code for response in first_run] == [503, 503, 200]
+    assert [response.status_code for response in replay] == [503, 503, 200]
+    assert [response.json() for response in replay] == [response.json() for response in first_run]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "events",
+    [
+        "not-json",
+        json.dumps({"page": 2, "type": "duplicate_items"}),
+        json.dumps([{"page": 2, "type": "unknown"}]),
+        json.dumps(
+            [
+                {"page": 2, "type": "delay", "delay_ms": 10},
+                {"page": 2, "type": "delay", "delay_ms": 20},
+            ]
+        ),
+        json.dumps([{"page": 1, "type": "duplicate_items"}]),
+        json.dumps(
+            [
+                {"page": 2, "type": "expire_session"},
+                {"page": 3, "type": "expire_session"},
+            ]
+        ),
+    ],
+)
+async def test_composite_event_query_rejects_invalid_config(
+    client: AsyncClient,
+    events: str,
+) -> None:
+    response = await client.get(
+        "/api/catalog",
+        params={"total_pages": 4, "events_json": events},
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_composite_events_reject_conflicting_legacy_or_scenario_config(
+    client: AsyncClient,
+) -> None:
+    expiry_event = json.dumps([{"page": 3, "type": "expire_session"}])
+    delay_event = json.dumps([{"page": 2, "type": "delay", "delay_ms": 10}])
+
+    legacy_conflict = await client.get(
+        "/api/catalog",
+        params={
+            "total_pages": 4,
+            "expire_session_after_page": 2,
+            "events_json": expiry_event,
+        },
+    )
+    scenario_conflict = await client.get(
+        "/api/catalog",
+        params={"scenario": "transient", "events_json": delay_event},
+    )
+
+    assert legacy_conflict.status_code == 422
+    assert scenario_conflict.status_code == 422
 
 
 @pytest.mark.anyio
@@ -549,6 +697,7 @@ def test_openapi_preserves_catalog_query_parameter_contract() -> None:
         "malformed_mode",
         "protected",
         "expire_session_after_page",
+        "events_json",
     }
     assert set(catalog_parameters) == common_parameters | {"resume_page"}
     assert set(api_parameters) == common_parameters | {"page"}
@@ -869,7 +1018,8 @@ async def test_dom_change_scenario_keeps_its_existing_structure(client: AsyncCli
     assert "'article' : 'div'" in script.text
     assert "'result-tile-v2' : 'product-card'" in script.text
     assert "content.className = 'content'" in script.text
-    assert "failure?.target === target && failure.page === page" in script.text
+    assert "failure?.target === target" in script.text
+    assert "failure.page === page" in script.text
     assert "setFailureState(outer, 'item', data.page" in script.text
     assert "setFailureState(next, 'next_page', data.page" in script.text
     assert "mode === 'missing'" in script.text

@@ -189,7 +189,7 @@
     },
     "/api/catalog": {
       "get": {
-        "description": "Returns deterministic catalog data for retry, pagination, duplicate, rate-limit, delay, checkpoint-recovery, and intentionally malformed-response tests. The malformed-api scenario deliberately violates the documented successful response contract.",
+        "description": "Returns deterministic catalog data for retry, pagination, duplicate, rate-limit, delay, checkpoint-recovery, composite-failure, and intentionally malformed-response tests. The malformed-api scenario deliberately violates the documented successful response contract.",
         "operationId": "get_catalog_page",
         "parameters": [
           {
@@ -397,6 +397,24 @@
               ],
               "description": "Deterministic broken-response mode for the malformed-api scenario.",
               "title": "Malformed Mode"
+            }
+          },
+          {
+            "description": "JSON array of validated deterministic composite failure events.",
+            "in": "query",
+            "name": "events_json",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "JSON array of validated deterministic composite failure events.",
+              "title": "Events Json"
             }
           },
           {
@@ -804,6 +822,24 @@
               ],
               "description": "Deterministic broken-response mode for the malformed-api scenario.",
               "title": "Malformed Mode"
+            }
+          },
+          {
+            "description": "JSON array of validated deterministic composite failure events.",
+            "in": "query",
+            "name": "events_json",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "JSON array of validated deterministic composite failure events.",
+              "title": "Events Json"
             }
           },
           {

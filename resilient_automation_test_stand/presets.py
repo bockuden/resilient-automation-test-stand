@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import tomllib
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import (
@@ -44,6 +45,61 @@ MalformedMode = Literal[
 ]
 
 
+class HttpErrorEvent(BaseModel):
+    """A bounded sequence of HTTP 503 responses on one page."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    type: Literal["http_error"]
+    page: int = Field(ge=1, le=20)
+    status: Literal[503]
+    attempts: int = Field(default=1, ge=1, le=10)
+
+
+class DelayEvent(BaseModel):
+    """A deterministic delay before a successful page response."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    type: Literal["delay"]
+    page: int = Field(ge=1, le=20)
+    delay_ms: int = Field(ge=1, le=30_000)
+
+
+class DuplicateItemsEvent(BaseModel):
+    """Repeat the previous page's final item on one selected page."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    type: Literal["duplicate_items"]
+    page: int = Field(ge=2, le=20)
+
+
+class ExpireSessionEvent(BaseModel):
+    """Expire the authenticated browser session before one selected page."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    type: Literal["expire_session"]
+    page: int = Field(ge=1, le=20)
+
+
+class SelectorChangeEvent(BaseModel):
+    """Change one existing catalog locator on one selected page."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    type: Literal["selector_change"]
+    page: int = Field(ge=1, le=20)
+    target: Literal["item", "next_page"]
+
+
+CompositeEvent = Annotated[
+    HttpErrorEvent | DelayEvent | DuplicateItemsEvent | ExpireSessionEvent | SelectorChangeEvent,
+    Field(discriminator="type"),
+]
+
+
 class SelectorFailureConfig(BaseModel):
     """A deterministic, page-scoped browser locator failure."""
 
@@ -77,7 +133,35 @@ class ScenarioDefaults(BaseModel):
     retry_after_seconds: int = Field(default=1, ge=0, le=300)
     malformed_mode: MalformedMode = "invalid_json"
     expire_session_after_page: int | None = Field(default=None, ge=1, le=20)
+    events: list[CompositeEvent] = Field(default_factory=list, max_length=50)
     selector_failure: SelectorFailureConfig | None = None
+
+    @model_validator(mode="after")
+    def validate_composite_events(self) -> "ScenarioDefaults":
+        if not self.events:
+            return self
+        if self.scenario != "success":
+            raise ValueError("composite events currently require scenario='success'")
+
+        seen: set[tuple[int, str]] = set()
+        expiry_count = 0
+        for event in self.events:
+            if event.page > self.total_pages:
+                raise ValueError(f"event page {event.page} exceeds total_pages={self.total_pages}")
+            key = (event.page, event.type)
+            if key in seen:
+                raise ValueError(f"duplicate {event.type!r} event on page {event.page}")
+            seen.add(key)
+            if event.type == "expire_session":
+                expiry_count += 1
+
+        if expiry_count > 1:
+            raise ValueError("only one expire_session event is supported")
+        if expiry_count and self.expire_session_after_page is not None:
+            raise ValueError(
+                "expire_session events cannot be combined with expire_session_after_page"
+            )
+        return self
 
 
 class ResolvedAuth(BaseModel):
@@ -241,7 +325,10 @@ def preset_url(
     query = list(parse_qsl(parts.query, keep_blank_values=True))
     preset_values = preset.model_dump()
     selector_failure = preset_values.pop("selector_failure")
+    events = preset_values.pop("events")
     values = {"run_id": preset_name, **preset_values}
+    if events:
+        values["events_json"] = json.dumps(events, separators=(",", ":"))
     if selector_failure is not None:
         values.update(
             {f"selector_failure_{name}": value for name, value in selector_failure.items()}

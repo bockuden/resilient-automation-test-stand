@@ -4,6 +4,9 @@
 
 ### Added
 
+- Added validated composite failure events for ordered HTTP 503, delay,
+  duplicate-item, session-expiry, and selector-change behavior within one
+  deterministic preset.
 - Added deterministic, `run_id`-isolated session expiry at a configured page
   boundary, including browser re-login and continuation from the interrupted page.
 - Added a deterministic `malformed-api` scenario for invalid JSON, truncated
@@ -28,8 +31,10 @@ locator tokens and login field names remain the defaults unless the optional
 scenarios are additive; existing successful, transient, permanent, rate-limit,
 and browser responses remain unchanged. Malformed responses intentionally
 violate the normal OpenAPI response contract only when explicitly selected.
-Session expiry is disabled unless `expire_session_after_page` is configured;
-ordinary API requests remain unprotected unless `protected=true` is explicit.
+Session expiry is disabled unless `expire_session_after_page` or a composite
+expiry event is configured; ordinary API requests remain unprotected unless
+`protected=true` is explicit. Composite events are additive, require the
+`success` base scenario, and do not alter existing preset behavior.
 
 ## 1.1.5 - 2026-07-28
 

@@ -50,3 +50,32 @@ malformed_mode = "invalid_json"
 scenario = "success"
 protected = true
 expire_session_after_page = 2
+
+[presets.composite-nightmare]
+scenario = "success"
+protected = true
+total_pages = 10
+
+[[presets.composite-nightmare.events]]
+page = 2
+type = "http_error"
+status = 503
+attempts = 2
+
+[[presets.composite-nightmare.events]]
+page = 4
+type = "duplicate_items"
+
+[[presets.composite-nightmare.events]]
+page = 5
+type = "expire_session"
+
+[[presets.composite-nightmare.events]]
+page = 7
+type = "selector_change"
+target = "next_page"
+
+[[presets.composite-nightmare.events]]
+page = 9
+type = "delay"
+delay_ms = 3000
