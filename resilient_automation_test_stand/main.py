@@ -10,9 +10,10 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 from fastapi import Cookie, FastAPI, Form, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 from resilient_automation_test_stand.presets import (
+    CompositeEvent,
     MalformedMode,
     ResolvedAuth,
     Scenario,
@@ -65,6 +66,7 @@ def _resolved_defaults(query: "CatalogQuery") -> ScenarioDefaults:
                 "page",
                 "run_id",
                 "resume_page",
+                "events_json",
                 "selector_failure_target",
                 "selector_failure_mode",
                 "selector_failure_page",
@@ -72,6 +74,20 @@ def _resolved_defaults(query: "CatalogQuery") -> ScenarioDefaults:
             },
         )
     )
+    if query.events_json is not None:
+        try:
+            events = json.loads(query.events_json)
+        except json.JSONDecodeError as error:
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "INVALID_COMPOSITE_EVENTS", "message": str(error)},
+            ) from error
+        if not isinstance(events, list):
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "INVALID_COMPOSITE_EVENTS", "message": "expected a JSON array"},
+            )
+        values["events"] = events
     if query.selector_failure_target is not None:
         values["selector_failure"] = SelectorFailureConfig(
             target=query.selector_failure_target,
@@ -79,7 +95,20 @@ def _resolved_defaults(query: "CatalogQuery") -> ScenarioDefaults:
             page=query.selector_failure_page or 1,
             delay_ms=query.selector_failure_delay_ms or 500,
         )
-    return ScenarioDefaults.model_validate(values)
+    try:
+        return ScenarioDefaults.model_validate(values)
+    except ValidationError as error:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "INVALID_SCENARIO_CONFIG",
+                "errors": error.errors(
+                    include_url=False,
+                    include_context=False,
+                    include_input=False,
+                ),
+            },
+        ) from error
 
 
 def _runtime_selector_failure(defaults: ScenarioDefaults) -> dict[str, object] | None:
@@ -98,17 +127,62 @@ def _runtime_selector_failure(defaults: ScenarioDefaults) -> dict[str, object] |
     }
 
 
+def _event_for_page(
+    defaults: ScenarioDefaults,
+    page: int,
+    event_type: str,
+) -> CompositeEvent | None:
+    return next(
+        (event for event in defaults.events if event.page == page and event.type == event_type),
+        None,
+    )
+
+
+def _composite_events_json(defaults: ScenarioDefaults) -> str | None:
+    if not defaults.events:
+        return None
+    return json.dumps(
+        [event.model_dump(mode="json") for event in defaults.events],
+        separators=(",", ":"),
+    )
+
+
+def _session_expiry_boundary(defaults: ScenarioDefaults) -> int | None:
+    if defaults.expire_session_after_page is not None:
+        return defaults.expire_session_after_page
+    event = next((event for event in defaults.events if event.type == "expire_session"), None)
+    return event.page - 1 if event is not None else None
+
+
 def _session_key_from_catalog_url(url: str) -> tuple[str, int] | None:
     parameters = parse_qs(urlsplit(url).query)
     boundary_values = parameters.get("expire_session_after_page")
-    if not boundary_values:
-        return None
-    try:
-        boundary = int(boundary_values[0])
-    except ValueError:
-        return None
-    if not 1 <= boundary <= 20:
-        return None
+    boundary = None
+    if boundary_values:
+        try:
+            boundary = int(boundary_values[0])
+        except ValueError:
+            return None
+        if not 1 <= boundary <= 20:
+            return None
+    else:
+        event_values = parameters.get("events_json")
+        if not event_values:
+            return None
+        try:
+            events = json.loads(event_values[0])
+        except json.JSONDecodeError:
+            return None
+        expiry_pages = [
+            event.get("page")
+            for event in events
+            if isinstance(event, dict) and event.get("type") == "expire_session"
+        ]
+        if len(expiry_pages) != 1 or not isinstance(expiry_pages[0], int):
+            return None
+        if not 1 <= expiry_pages[0] <= 20:
+            return None
+        boundary = expiry_pages[0] - 1
     run_id = parameters.get("run_id", ["manual"])[0]
     return (run_id, boundary)
 
@@ -217,6 +291,10 @@ class CatalogQuery(BaseModel):
     malformed_mode: MalformedMode | None = Field(
         default=None,
         description="Deterministic broken-response mode for the malformed-api scenario.",
+    )
+    events_json: str | None = Field(
+        default=None,
+        description="JSON array of validated deterministic composite failure events.",
     )
     protected: bool | None = Field(
         default=None,
@@ -457,7 +535,9 @@ async def catalog(
     demo_session: Annotated[str | None, Cookie()] = None,
 ) -> HTMLResponse:
     defaults = _resolved_defaults(query)
-    requires_session = defaults.protected or defaults.expire_session_after_page is not None
+    events_json = _composite_events_json(defaults)
+    expiry_boundary = _session_expiry_boundary(defaults)
+    requires_session = defaults.protected or expiry_boundary is not None
 
     if requires_session and demo_session != "authenticated":
         failure_query = (
@@ -473,6 +553,7 @@ async def catalog(
             if defaults.expire_session_after_page is not None
             else {}
         )
+        event_query = {"events_json": events_json} if events_json is not None else {}
         target_query = urlencode(
             {
                 "scenario": defaults.scenario,
@@ -487,6 +568,7 @@ async def catalog(
                 "malformed_mode": defaults.malformed_mode,
                 "protected": "true",
                 "resume_page": query.resume_page,
+                **event_query,
                 **expiry_query,
                 **failure_query,
             }
@@ -508,6 +590,7 @@ async def catalog(
         "protected": requires_session,
         "expireSessionAfterPage": defaults.expire_session_after_page,
         "initialPage": query.resume_page,
+        "compositeEvents": [event.model_dump(mode="json") for event in defaults.events],
         "selectors": app.state.selectors.model_dump(),
         "selectorFailure": _runtime_selector_failure(defaults),
     }
@@ -536,16 +619,25 @@ async def catalog_api(
     demo_session: Annotated[str | None, Cookie()] = None,
 ) -> CatalogPage | Response:
     defaults = _resolved_defaults(query)
-    if query.protected is True or defaults.expire_session_after_page is not None:
+    expiry_boundary = _session_expiry_boundary(defaults)
+    if query.protected is True or expiry_boundary is not None:
         _require_catalog_session(
             query.run_id,
             query.page,
-            defaults.expire_session_after_page,
+            expiry_boundary,
             demo_session,
         )
     key = (query.run_id, defaults.scenario, query.page)
     request_attempts[key] += 1
     attempt = request_attempts[key]
+
+    http_error = _event_for_page(defaults, query.page, "http_error")
+    if http_error is not None and attempt <= http_error.attempts:
+        raise HTTPException(
+            status_code=http_error.status,
+            detail={"code": "COMPOSITE_HTTP_ERROR", "attempt": attempt},
+            headers={"Retry-After": "1"},
+        )
 
     if defaults.scenario == "transient" and attempt <= defaults.fail_for:
         if defaults.failure_delay_ms:
@@ -578,10 +670,21 @@ async def catalog_api(
     if defaults.scenario == "slow":
         await asyncio.sleep(defaults.delay_ms / 1000)
 
+    delay = _event_for_page(defaults, query.page, "delay")
+    if delay is not None:
+        await asyncio.sleep(delay.delay_ms / 1000)
+
+    duplicate_items = _event_for_page(defaults, query.page, "duplicate_items") is not None
+
     page = CatalogPage(
         page=query.page,
         total_pages=defaults.total_pages,
-        items=_items_for_page(query.page, defaults.scenario, defaults.total_pages),
+        items=_items_for_page(
+            query.page,
+            defaults.scenario,
+            defaults.total_pages,
+            duplicate_items=duplicate_items,
+        ),
         scenario=defaults.scenario,
         attempt=attempt,
     )
@@ -618,13 +721,19 @@ def _malformed_api_response(page: CatalogPage, mode: MalformedMode) -> Response:
     )
 
 
-def _items_for_page(page: int, scenario: Scenario, total_pages: int) -> list[CatalogItem]:
+def _items_for_page(
+    page: int,
+    scenario: Scenario,
+    total_pages: int,
+    *,
+    duplicate_items: bool = False,
+) -> list[CatalogItem]:
     if page > total_pages:
         return []
 
     first = (page - 1) * 5 + 1
     identifiers = list(range(first, first + 5))
-    if scenario == "duplicates" and page > 1:
+    if (scenario == "duplicates" and page > 1) or duplicate_items:
         identifiers[0] = first - 1
 
     return [
