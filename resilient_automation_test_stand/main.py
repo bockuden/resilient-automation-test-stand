@@ -604,8 +604,9 @@ async def catalog(
     summary="Fetch one deterministic catalog page",
     description=(
         "Returns deterministic catalog data for retry, pagination, duplicate, rate-limit, delay, "
-        "checkpoint-recovery, and intentionally malformed-response tests. The malformed-api "
-        "scenario deliberately violates the documented successful response contract."
+        "checkpoint-recovery, composite-failure, and intentionally malformed-response tests. "
+        "The malformed-api scenario deliberately violates the documented successful response "
+        "contract."
     ),
     responses={
         401: {"description": "Authentication is required or the deterministic session expired."},

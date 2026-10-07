@@ -147,9 +147,7 @@ class ScenarioDefaults(BaseModel):
         expiry_count = 0
         for event in self.events:
             if event.page > self.total_pages:
-                raise ValueError(
-                    f"event page {event.page} exceeds total_pages={self.total_pages}"
-                )
+                raise ValueError(f"event page {event.page} exceeds total_pages={self.total_pages}")
             key = (event.page, event.type)
             if key in seen:
                 raise ValueError(f"duplicate {event.type!r} event on page {event.page}")

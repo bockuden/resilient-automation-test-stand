@@ -53,6 +53,7 @@ parameters. `resume_page` exists only on `/catalog`; `page` exists only on
 | `rate_limit_for` | `2` | integer `0..10` | Initial `429` responses per page in `rate-limit`. |
 | `retry_after_seconds` | `1` | integer `0..300` | `Retry-After` delta-seconds value in `rate-limit`. |
 | `malformed_mode` | `invalid_json` | `invalid_json`, `truncated_json`, `wrong_content_type`, `missing_fields`, `wrong_field_type` | Deterministic contract violation emitted by `malformed-api`. |
+| `events_json` | unset | JSON array with at most 50 validated event objects | Portable representation of a preset's composite events. |
 | `expire_session_after_page` | unset | integer `1..20` | Expire an authenticated session before the following page. |
 | `delay_ms` | `1500` | integer `0..30000` | Delay per API response in `slow`. |
 | `fail_page` | `3` | integer `1..20` | Permanently failing page in `resume`. |
@@ -101,11 +102,26 @@ empty.
   boundary. API requests then return `401 SESSION_EXPIRED` until valid re-login.
   The browser preserves all scenario parameters and resumes the interrupted
   page. Different `run_id` values remain isolated.
+- Composite events are available only with the `success` base scenario. The
+  supported objects are `http_error` (`page`, `status=503`, `attempts=1..10`),
+  `delay` (`page`, `delay_ms=1..30000`), `duplicate_items` (`page=2..20`),
+  `expire_session` (`page=1..20`), and `selector_change` (`page`, `target` set
+  to `item` or `next_page`). Every page must also be within `total_pages`.
+- Different composite event types may share a page. They execute in this fixed
+  order: session authentication and expiry, HTTP 503, successful-response
+  delay, duplicate payload construction, then browser selector mutation.
+  Duplicate `(page, type)` pairs are rejected. A configuration may contain at
+  most one `expire_session` event and cannot combine it with
+  `expire_session_after_page`.
+- Composite attempt state is isolated by `(run_id, scenario, page)`. The event
+  list is preserved through browser API calls and login redirects. Reusing the
+  same configuration after `POST /admin/reset` reproduces the same status and
+  payload sequence.
 - Invalid constrained values return FastAPI's standard `422` validation body.
 
-Scenario failures expose `detail.code` as one of
-`TRANSIENT_CATALOG_FAILURE`, `PERMANENT_CATALOG_FAILURE`, or
-`CHECKPOINT_RESUME_FAILURE`. Consumers may assert these codes but not free-form
+Scenario failures expose stable codes including `TRANSIENT_CATALOG_FAILURE`,
+`PERMANENT_CATALOG_FAILURE`, `CHECKPOINT_RESUME_FAILURE`, and
+`COMPOSITE_HTTP_ERROR`. Consumers may assert these codes but not free-form
 error wording.
 
 ### Browser and demo-login contract
@@ -142,8 +158,9 @@ the local return URL. `POST /admin/reset` clears all expiry state.
 `--preset`, `--list-presets`, and `--print-url` are mutually exclusive. Invalid
 or unknown presets and missing config produce actionable argparse errors. Preset
 files accept documented `ScenarioDefaults` fields, including `malformed_mode`,
-`expire_session_after_page`, and the optional nested `selector_failure` table,
-and reject unknown fields.
+`expire_session_after_page`, the optional nested `selector_failure` table, and
+an `events` array of tables. They reject unknown fields and conflicting event
+definitions.
 
 ## Contract verification
 
