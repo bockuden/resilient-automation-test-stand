@@ -51,6 +51,7 @@ dev = [
 
 [project.scripts]
 automation-test-stand = "resilient_automation_test_stand.cli:main"
+automation-gauntlet = "resilient_automation_test_stand.gauntlet:main"
 
 [project.urls]
 Source = "https://github.com/bockuden/resilient-automation-test-stand"
