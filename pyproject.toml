@@ -59,7 +59,7 @@ Issues = "https://github.com/bockuden/resilient-automation-test-stand/issues"
 Documentation = "https://github.com/bockuden/resilient-automation-test-stand#readme"
 Changelog = "https://github.com/bockuden/resilient-automation-test-stand/blob/main/CHANGELOG.md"
 "API contract" = "https://github.com/bockuden/resilient-automation-test-stand/blob/main/docs/compatibility.md"
-"Resilience Challenge" = "https://github.com/bockuden/resilient-automation-test-stand/blob/main/CHALLENGE.md"
+"Automation Gauntlet" = "https://github.com/bockuden/resilient-automation-test-stand/blob/main/CHALLENGE.md"
 "Container images" = "https://github.com/bockuden/resilient-automation-test-stand/pkgs/container/resilient-automation-test-stand"
 "C# reference consumer" = "https://github.com/bockuden/resilient-browser-automation"
 
