@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.2.0 - 2026-10-09
+
 ### Added
 
 - Added the optional ten-level Automation Gauntlet with deterministic,
