@@ -12,7 +12,7 @@ recover from real, repeatable failure sequences—not just happy-path responses.
 Unlike a static mock endpoint, it ships browser and API workflows with
 deterministic stateful failures, stable locators, login, and pagination.
 
-[Try the Resilience Challenge](https://github.com/bockuden/resilient-automation-test-stand/blob/main/CHALLENGE.md)
+[Try the Automation Gauntlet](https://github.com/bockuden/resilient-automation-test-stand/blob/main/CHALLENGE.md)
 · [See the C# reference consumer for a production-style worker that is validated against a pinned Test Stand release.](https://github.com/bockuden/resilient-browser-automation)
 · [Read the public compatibility contract](https://github.com/bockuden/resilient-automation-test-stand/blob/main/docs/compatibility.md)
 
@@ -336,18 +336,32 @@ python -m resilient_automation_test_stand.examples.resume_checkpoint \
   --checkpoint .tmp/resume-example.json
 ```
 
-These examples correspond to Levels 2–3 and the recovery-evidence bonus in the
-[Resilience Challenge](https://github.com/bockuden/resilient-automation-test-stand/blob/main/CHALLENGE.md).
+These examples correspond to retry, authentication, deduplication, and
+checkpoint levels in the
+[Automation Gauntlet](https://github.com/bockuden/resilient-automation-test-stand/blob/main/CHALLENGE.md).
 
 For a production-style .NET consumer with retries, checkpoints, cancellation,
 and browser evidence, see
 [resilient-browser-automation](https://github.com/bockuden/resilient-browser-automation).
 
-## Resilience Challenge
+## Automation Gauntlet
 
-Work through the four-level, reproducible
-[Resilience Challenge](https://github.com/bockuden/resilient-automation-test-stand/blob/main/CHALLENGE.md) to validate a consumer against success,
-transient recovery, login, DOM changes, duplicates, resume, and cancellation.
+Work through the ten-level, reproducible
+[Automation Gauntlet](https://github.com/bockuden/resilient-automation-test-stand/blob/main/CHALLENGE.md) to validate a consumer against pagination, retries,
+authentication, selector changes, deduplication, checkpoint recovery, session
+expiry, rate limiting, and composite failures. Any client can emit the portable
+JSON evidence format and validate it locally:
+
+```bash
+automation-gauntlet list
+automation-gauntlet describe 1
+automation-gauntlet template 1 > evidence.json
+automation-gauntlet validate evidence.json
+```
+
+The validator returns machine-readable JSON and exits with `0` for pass, `1`
+for an unmet objective, or `2` for invalid evidence. It runs separately from
+the test stand server and does not change ordinary scenario behavior.
 
 ## Named scenario presets
 

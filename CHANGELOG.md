@@ -4,6 +4,9 @@
 
 ### Added
 
+- Added the optional ten-level Automation Gauntlet with deterministic,
+  language-independent JSON evidence, objective pass/fail validation, and a
+  separate `automation-gauntlet` command.
 - Added validated composite failure events for ordered HTTP 503, delay,
   duplicate-item, session-expiry, and selector-change behavior within one
   deterministic preset.
@@ -35,6 +38,8 @@ Session expiry is disabled unless `expire_session_after_page` or a composite
 expiry event is configured; ordinary API requests remain unprotected unless
 `protected=true` is explicit. Composite events are additive, require the
 `success` base scenario, and do not alter existing preset behavior.
+Automation Gauntlet reuses those public scenarios and runs as a separate
+validator, so ordinary server URLs and request handling remain unchanged.
 
 ## 1.1.5 - 2026-07-28
 

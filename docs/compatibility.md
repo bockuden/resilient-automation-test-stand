@@ -147,6 +147,10 @@ the local return URL. `POST /admin/reset` clears all expiry state.
 | Command or option | Stable behavior |
 | --- | --- |
 | `automation-test-stand` | Starts the server with built-in defaults. |
+| `automation-gauntlet list` | Lists all ten deterministic challenge levels as JSON. |
+| `automation-gauntlet describe LEVEL` | Returns a level's objective and complete entry URLs as JSON. |
+| `automation-gauntlet template LEVEL` | Emits a schema-versioned starter evidence document. |
+| `automation-gauntlet validate PATH` | Validates evidence from a JSON file, or from standard input when `PATH` is `-`. |
 | `--host HOST` | Bind host; default `127.0.0.1`. |
 | `--port PORT` | Bind port; default `8080`. |
 | `--log-level LEVEL` | Uvicorn log level; default `info`. |
@@ -161,6 +165,14 @@ files accept documented `ScenarioDefaults` fields, including `malformed_mode`,
 `expire_session_after_page`, the optional nested `selector_failure` table, and
 an `events` array of tables. They reject unknown fields and conflicting event
 definitions.
+
+Gauntlet evidence schema version `1` is language independent and additive to
+the server contract. Validation prints JSON and exits with `0` for a passed
+objective, `1` for valid evidence that does not meet the objective, and `2` for
+invalid evidence. The validator checks exact page sets, ordered statuses, raw
+item IDs, retry waits, login and session recovery counts, checkpoint fields,
+selector-change evidence, and configured response delays. It does not add
+challenge state to the server or alter scenario request handling.
 
 ## Contract verification
 
