@@ -33,7 +33,7 @@ automation-test-stand --port 8080
 
 ```bash
 docker run --rm -p 8080:8080 \
-  ghcr.io/bockuden/resilient-automation-test-stand:1.1.5
+  ghcr.io/bockuden/resilient-automation-test-stand:1.2.0
 ```
 
 After starting either distribution, open this URL in a browser or navigate to

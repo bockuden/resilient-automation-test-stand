@@ -36,6 +36,7 @@ No public contract changes.
     assert "## Try this URL" in notes
     assert "## Contract and compatibility" in notes
     assert "/blob/v2.3.4/docs/compatibility.md" in notes
+    assert "[Automation Gauntlet]" in notes
     assert "## Upgrade notes" in notes
     assert "No public contract changes." in notes
 

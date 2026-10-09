@@ -95,7 +95,7 @@ third succeeds.
 
 - [Public compatibility contract]({REPOSITORY_URL}/blob/{tag}/docs/compatibility.md)
 - [OpenAPI snapshot]({REPOSITORY_URL}/blob/{tag}/docs/api/openapi.json)
-- [Resilience Challenge]({REPOSITORY_URL}/blob/{tag}/CHALLENGE.md)
+- [Automation Gauntlet]({REPOSITORY_URL}/blob/{tag}/CHALLENGE.md)
 
 ## Upgrade notes
 

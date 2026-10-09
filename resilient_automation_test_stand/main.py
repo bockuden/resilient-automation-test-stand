@@ -26,7 +26,7 @@ from resilient_automation_test_stand.presets import (
 
 app = FastAPI(
     title="Resilient Browser Automation Test Stand",
-    version="1.1.5",
+    version="1.2.0",
     docs_url="/api-docs",
 )
 app.mount(
